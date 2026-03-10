@@ -13,7 +13,7 @@ This application takes the raw reservations export (`All_BT_Reservations.csv`) a
    ```bash
    cd DataAudit
    ```
-3. Install dependencies by running:
+3. Install dependencies:
    ```bash
    ./setup.sh
    ```
