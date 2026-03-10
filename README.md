@@ -13,12 +13,20 @@ This application takes the raw reservations export (`All_BT_Reservations.csv`) a
    ```bash
    cd DataAudit
    ```
-3. Run the Streamlit app using `uv`:
+3. Install dependencies by running:
+   ```bash
+   ./setup.sh
+   ```
+4. To run the application, make sure your environment is activated:
+   ```bash
+   source .venv/bin/activate
+   ```   
+5. Run the Streamlit app using `uv`:
    ```bash
    uv run streamlit run src/app.py
    ```
-4. The application will open in your browser automatically.
-5. Upload the raw data CSV and (optionally) the historic `One Sheet`.
+6. The application will open in your browser automatically.
+7. Upload the raw data CSV and (optionally) the historic `One Sheet`.
 
 ## Data Filtering & Calculation Rules
 
