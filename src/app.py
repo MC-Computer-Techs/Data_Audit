@@ -72,30 +72,103 @@ if uploaded_file is not None:
                 
                 with tab1:
                     st.subheader(f"Top Sheet: AY {ay_start_year}-{ay_start_year+1}")
-                    st.dataframe(top_sheet_df)
                     
+                    # Provide download button for the fully formatted Top Sheet CSV at the top
                     csv_buffer = io.StringIO()
                     top_sheet_df.to_csv(csv_buffer, index=False, header=False)
                     st.download_button(
-                        label="Download Top Sheet CSV",
+                        label="Download Full Top Sheet CSV",
                         data=csv_buffer.getvalue(),
                         file_name=f"Top_Sheet_{ay_start_year}-{ay_start_year+1}.csv",
-                        mime="text/csv"
+                        mime="text/csv",
+                        type="primary"
                     )
-                
+                    
+                    st.divider()
+                    
+                    # High level metrics
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("Total Reservations", len(processed_df['overall']))
+                    with col2:
+                        st.metric("Total Hours", round(processed_df['overall']['Calc Hours'].sum(), 2))
+                        
+                    st.divider()
+                    
+                    # Helper to generate pretty view dataframe from df_pack subsets
+                    def display_top_sheet_section(title, category_col, entity_list, df_target, is_hours=False):
+                        st.markdown(f"**{title}**")
+                        rows = []
+                        for entity in entity_list:
+                            # Reservations and Hours per semester
+                            sem_data = {}
+                            total_qty = 0
+                            for s in semesters:
+                                subset = df_target[(df_target[category_col] == entity) & (df_target['Semester'] == s)]
+                                if not is_hours:
+                                    qty = len(subset)
+                                else:
+                                    qty = round(subset['Calc Hours'].sum(), 2)
+                                sem_data[s] = qty
+                                total_qty += qty
+                            
+                            row_data = {category_col: entity}
+                            row_data.update(sem_data)
+                            row_data['Total'] = round(total_qty, 2) if is_hours else total_qty
+                            rows.append(row_data)
+                            
+                        # Convert to df and display
+                        section_df = pd.DataFrame(rows)
+                        st.dataframe(section_df, use_container_width=True, hide_index=True)
+
+                    st.markdown("### Top Sheet Breakdown")
+                    st.write("Summary totals by Space, Department, and School.")
+                    
+                    df_overall = processed_df['overall']
+                    df_rooms = processed_df['rooms']
+                    df_depts_schools = processed_df['depts_schools']
+                    
+                    # Rooms
+                    room_order = ['1201 Seminar Room', '233 Co-Lab', '230 Audio Lab', '221-224 Ballrooms', '220 Blackbox', '202 Lecture Hall', '103 Garage', '260 Post Production Lab']
+                    rc1, rc2 = st.columns(2)
+                    with rc1: display_top_sheet_section("Reservations per Room", "Clean Room", room_order, df_rooms)
+                    with rc2: display_top_sheet_section("Hours per Room", "Clean Room", room_order, df_rooms, is_hours=True)
+                    
+                    # Programs
+                    prog_order = ['ALT (Ed Leadership, ECT, and Higher and Post Secondary Education)', 'IDM', 'ITP / IMA / Low Res', 'CDI / Recorded Music', 'Music Tech', 'MARL', 'MPAP', 'Game Center', 'Other Group(s)', 'Community Partner']
+                    pc1, pc2 = st.columns(2)
+                    with pc1: display_top_sheet_section("Reservations per Program", "Clean Department", prog_order, df_depts_schools)
+                    with pc2: display_top_sheet_section("Hours per Program", "Clean Department", prog_order, df_depts_schools, is_hours=True)
+                    
+                    # Schools
+                    school_order = ['Tandon', 'Tisch', 'Steinhardt', 'Provost', 'URPA / Community Partner', 'Central', 'Other Schools']
+                    sc1, sc2 = st.columns(2)
+                    with sc1: display_top_sheet_section("Reservations per School", "Clean School", school_order, df_depts_schools)
+                    with sc2: display_top_sheet_section("Hours per School", "Clean School", school_order, df_depts_schools, is_hours=True)
+
                 with tab2:
-                    st.subheader("Generated Grouping Pair Files")
-                    st.write("These files divide the reservations by semester, then by School, Department, or Room:")
+                    st.subheader("Generated Grouping Pairs")
+                    st.write("These tables divide the reservations by semester, then by School, Department, or Room:")
+                    
+                    # Organize grouping pairs visually with expanders
                     for fp in generated_files:
                         fname = os.path.basename(fp)
-                        with open(fp, "rb") as f:
-                            st.download_button(
-                                label=f"Download {fname}",
-                                data=f,
-                                file_name=fname,
-                                mime="text/csv",
-                                key=fname
-                            )
+                        # Remove .csv for a cleaner title
+                        clean_title = fname.replace('.csv', '').replace('_', ' ')
+                        with st.expander(f"📄 {clean_title}"):
+                            # Read and display data beautifully
+                            df_group = pd.read_csv(fp)
+                            st.dataframe(df_group, use_container_width=True, hide_index=True)
+                            
+                            # Provide download button below the table
+                            with open(fp, "rb") as f:
+                                st.download_button(
+                                    label=f"Download {fname}",
+                                    data=f,
+                                    file_name=fname,
+                                    mime="text/csv",
+                                    key=fname
+                                )
                 
                 with tab3:
                     st.subheader("One Sheet Update")
