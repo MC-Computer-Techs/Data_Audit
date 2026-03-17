@@ -59,14 +59,14 @@ def extract_departments(row):
     if 'cdi ' in title or 'recorded music' in title or 'clive' in title: depts.add('CDI / Recorded Music')
     if 'game center' in title: depts.add('Game Center')
     if 'mpap ' in title: depts.add('MPAP')
-    if 'alt ' in title or 'ect ' in title: depts.add('ALT (Ed Leadership, ECT, and Higher and Post Secondary Education)')
+    if 'alt ' in title or 'alt-' in title or 'ect ' in title: depts.add('ALT (Ed Leadership, ECT, and Higher and Post Secondary Education)')
     
     if len(depts) == 0:
         depts.add('Other Group(s)')
         
     return list(depts)
 
-def map_school(dept_str, school_str):
+def map_school(dept_str, school_str, title_str=""):
     d = clean_department(dept_str)
     if not pd.isna(school_str) and str(school_str).strip() != '':
         # Keep original if provided, but raw data has Role instead
@@ -80,6 +80,12 @@ def map_school(dept_str, school_str):
     if d in tisch_depts: return 'Tisch'
     if d in tandon_depts: return 'Tandon'
     if d == 'Community Partner': return 'URPA / Community Partner'
+    
+    # Infer from title if department mapping fell through
+    t = str(title_str).lower()
+    if 'tisch' in t or 'film' in t or 'drama' in t: return 'Tisch'
+    if 'steinhardt' in t: return 'Steinhardt'
+    if any(kw in t for kw in ['tandon', 'cusp', 'ece', 'sase', 'nsbe', 'terra', 'csaw', 'mae seminar', 'cybersecurity']): return 'Tandon'
     
     return 'Other Schools'
 
@@ -179,7 +185,7 @@ def process_reservations(df, ay_start_year):
         for d in row['All Depts']:
             new_row = row.copy()
             new_row['Clean Department'] = d
-            new_row['Clean School'] = map_school(d, '')
+            new_row['Clean School'] = map_school(d, '', row.get('Reservation Title', ''))
             dept_rows.append(new_row)
             
     df_depts_schools = pd.DataFrame(dept_rows)
