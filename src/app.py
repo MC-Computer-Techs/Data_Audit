@@ -40,6 +40,14 @@ if uploaded_file is not None:
                 
                 generated_files = export_grouping_pairs(processed_df, grouping_dir)
                 
+                # 3b. Export "Other Schools" subset
+                other_dir = os.path.join(base_dir, "Other")
+                os.makedirs(other_dir, exist_ok=True)
+                df_depts = processed_df['depts_schools']
+                other_schools_df = df_depts[df_depts['Clean School'] == 'Other Schools']
+                other_schools_path = os.path.join(other_dir, "Other_Schools.csv")
+                other_schools_df.to_csv(other_schools_path, index=False)
+
                 # 4. Generate Top Sheet
                 top_sheet_df = generate_top_sheet(processed_df, ay_start_year, semesters)
                 ts_path = os.path.join(base_dir, f"Top_Sheet_{ay_start_year}-{ay_start_year+1}.csv")
