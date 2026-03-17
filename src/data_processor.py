@@ -89,13 +89,13 @@ def get_semester(date_obj, ay_start_year):
     year2 = ay_start_year + 1
     
     fall_start = pd.Timestamp(year=year1, month=9, day=1)
-    fall_end = pd.Timestamp(year=year1, month=12, day=22)
-    winter_start = pd.Timestamp(year=year2, month=1, day=4)
+    fall_end = pd.Timestamp(year=year1, month=12, day=31)
+    winter_start = pd.Timestamp(year=year2, month=1, day=1)
     winter_end = pd.Timestamp(year=year2, month=1, day=18)
     spring_start = pd.Timestamp(year=year2, month=1, day=19)
     spring_end = pd.Timestamp(year=year2, month=5, day=16)
     summer_start = pd.Timestamp(year=year2, month=5, day=17)
-    summer_end = pd.Timestamp(year=year2, month=9, day=1)
+    summer_end = pd.Timestamp(year=year2, month=8, day=31)
     
     if fall_start <= date_obj <= fall_end: return f'Fall {year1}'
     if winter_start <= date_obj <= winter_end: return f'Winter {year2}'
