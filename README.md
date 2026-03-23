@@ -8,25 +8,47 @@ This application takes the raw reservations export (`All_BT_Reservations.csv`) a
 
 ## How to Run
 
-1. Make sure you have `uv` installed.
+1. Make sure you have `uv` installed. Use `uv venv` to create a virtual environment, and use that when developing. If not in the virtual environment, use `source .venv/bin/activate` to get into it.
 2. Clone this repository and navigate to the directory:
    ```bash
    cd DataAudit
    ```
 3. Install dependencies:
    ```bash
-   ./setup.sh
+   uv pip install -r requirements.txt
    ```
+   *(Alternatively, run `./setup.sh` if it uses uv under the hood).*
+   
+   *Note: The application uses absolute imports (e.g., `from src.data_processor import ...`) which is resolved correctly when running `streamlit run src/app.py` from the project root.*
 4. To run the application, make sure your environment is activated:
    ```bash
    source .venv/bin/activate
-   ```   
+   ```
+   *Troubleshooting tip: If your python environment gets messed up, try recreating it:*
+   ```bash
+   rm -rf .venv
+   uv venv
+   source .venv/bin/activate
+   uv pip install -r requirements.txt
+   ```
+   *If `uv` commands hang or freeze indefinitely without output, macOS Gatekeeper may be blocking the executable in the background. To fix this, remove the quarantine flag and kill stuck instances:*
+   ```bash
+   xattr -d com.apple.quarantine ~/.local/bin/uv
+   killall -9 uv
+   ```
 5. Run the Streamlit app using `uv`:
    ```bash
    uv run streamlit run src/app.py
    ```
 6. The application will open in your browser automatically.
 7. Upload the raw data CSV and (optionally) the historic `One Sheet`.
+
+## Editable Grouping Pairs
+
+Once the data is processed, you can view the detailed grouping pairs in the **Grouping Pairs** tab. These tables are now fully interactive:
+- You can directly edit the values (e.g., `Clean School`, `Calc Hours`) within the Grouping Pairs tables.
+- Any changes made will automatically re-calculate the **Top Sheet Overview** to reflect the updated metrics.
+- The underlying CSV files for both the Grouping Pairs and the Top Sheet are automatically re-exported to your local directory.
 
 ## Data Filtering & Calculation Rules
 
