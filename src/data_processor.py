@@ -138,25 +138,43 @@ def calc_capped_hours(row):
         return 0
 
 def process_reservations(df, ay_start_year):
-    df = df.copy()
+    df_raw = df.copy()
+    if '_raw_id' not in df_raw.columns:
+        df_raw['_raw_id'] = range(len(df_raw))
+    
+    # Track filter reasons
+    df_raw['Filtered Out'] = False
+    df_raw['Filter Reason'] = ''
     
     # 1. Filter Statuses per Reference.md
-    if 'End Event Status' in df.columns:
-        df = df[df['End Event Status'].isin(['Approved', 'Checked out'])].copy()
+    if 'End Event Status' in df_raw.columns:
+        valid_status = df_raw['End Event Status'].isin(['Approved', 'Checked out'])
+        df_raw.loc[~valid_status, 'Filtered Out'] = True
+        df_raw.loc[~valid_status, 'Filter Reason'] += 'Status not Approved/Checked out; '
+    else:
+        valid_status = pd.Series(True, index=df_raw.index)
         
     # 2. Exclude Maintenance
-    if 'Booking Type' in df.columns and 'Reservation Title' in df.columns:
-        maint_mask = df['Booking Type'].astype(str).str.lower().str.contains('maintenance') | \
-                    df['Reservation Title'].astype(str).str.lower().str.contains('maintenance')
-        df = df[~maint_mask].copy()
+    if 'Booking Type' in df_raw.columns and 'Reservation Title' in df_raw.columns:
+        maint_mask = df_raw['Booking Type'].astype(str).str.lower().str.contains('maintenance') | \
+                    df_raw['Reservation Title'].astype(str).str.lower().str.contains('maintenance')
+        df_raw.loc[maint_mask, 'Filtered Out'] = True
+        df_raw.loc[maint_mask, 'Filter Reason'] += 'Maintenance; '
+    else:
+        maint_mask = pd.Series(False, index=df_raw.index)
 
-    df['Booking Start Date'] = pd.to_datetime(df['Booking Start Date'], errors='coerce')
-    df['Booking End Date'] = pd.to_datetime(df['Booking End Date'], errors='coerce')
-    df['Semester'] = df['Booking Start Date'].apply(lambda x: get_semester(x, ay_start_year))
+    df_raw['Booking Start Date'] = pd.to_datetime(df_raw['Booking Start Date'], errors='coerce')
+    df_raw['Booking End Date'] = pd.to_datetime(df_raw['Booking End Date'], errors='coerce')
+    df_raw['Semester'] = df_raw['Booking Start Date'].apply(lambda x: get_semester(x, ay_start_year))
     
     # Filter only for the current Academic Year
     semesters = [f'Fall {ay_start_year}', f'Winter {ay_start_year+1}', f'Spring {ay_start_year+1}', f'Summer {ay_start_year+1}']
-    df = df[df['Semester'].isin(semesters)].copy()
+    valid_semester = df_raw['Semester'].isin(semesters)
+    df_raw.loc[~valid_semester, 'Filtered Out'] = True
+    df_raw.loc[~valid_semester, 'Filter Reason'] += 'Outside AY Set Ranges; '
+    
+    # Create the valid subset to continue normal processing
+    df = df_raw[~df_raw['Filtered Out']].copy()
     
     df['Calc Hours'] = df.apply(calc_capped_hours, axis=1)
     
@@ -174,7 +192,7 @@ def process_reservations(df, ay_start_year):
             new_row['Calc Hours'] = row['Calc Hours'] / total_rooms
             room_rows.append(new_row)
     
-    df_rooms = pd.DataFrame(room_rows)
+    df_rooms = pd.DataFrame(room_rows).reset_index(drop=True)
     
     # Extract multiple departments from title per Reference.md
     df['All Depts'] = df.apply(extract_departments, axis=1)
@@ -188,13 +206,14 @@ def process_reservations(df, ay_start_year):
             new_row['Clean School'] = map_school(d, '', row.get('Reservation Title', ''))
             dept_rows.append(new_row)
             
-    df_depts_schools = pd.DataFrame(dept_rows)
+    df_depts_schools = pd.DataFrame(dept_rows).reset_index(drop=True)
     
     # Store multiple dataframes back so export and Top Sheet can use them
     df_pack = {
         'overall': df,
         'rooms': df_rooms,
-        'depts_schools': df_depts_schools
+        'depts_schools': df_depts_schools,
+        'raw_annotated': df_raw
     }
     
     return df_pack, semesters

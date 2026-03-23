@@ -3,7 +3,10 @@ import pandas as pd
 import os
 import io
 import datetime
-from data_processor import process_reservations, export_grouping_pairs, generate_top_sheet, update_one_sheet
+try:
+    from src.data_processor import process_reservations, export_grouping_pairs, generate_top_sheet, update_one_sheet
+except ImportError:
+    from data_processor import process_reservations, export_grouping_pairs, generate_top_sheet, update_one_sheet
 
 st.set_page_config(page_title="Data Audit Tool", layout="wide")
 
@@ -17,6 +20,9 @@ with col1:
     uploaded_file = st.file_uploader("Upload 'Booking Tool Reservations' CSV", type=['csv'])
 with col2:
     one_sheet_file = st.file_uploader("Upload Historic 'One Sheet' CSV (Optional)", type=['csv'])
+
+if 'data_processed' not in st.session_state:
+    st.session_state.data_processed = False
 
 if uploaded_file is not None:
     st.success("File uploaded successfully!")
@@ -34,7 +40,6 @@ if uploaded_file is not None:
                 base_dir = f"{ay_start_year}-{ay_start_year+1}_Data_Audit"
                 grouping_dir = os.path.join(base_dir, "Grouping_Pairs")
                 
-                # We'll save files locally just in case, but also provide them for download in UI
                 if not os.path.exists(grouping_dir):
                     os.makedirs(grouping_dir, exist_ok=True)
                 
@@ -55,140 +60,266 @@ if uploaded_file is not None:
                 
                 # 4b. Update One Sheet (if provided)
                 one_sheet_updated_df = None
+                one_sheet_bytes = None
                 if one_sheet_file is not None:
                     # Save the uploaded one sheet temporarily to read with standard python csv reader
                     temp_os_path = os.path.join(base_dir, "temp_one_sheet.csv")
+                    one_sheet_bytes = one_sheet_file.getvalue()
                     with open(temp_os_path, "wb") as f:
-                        f.write(one_sheet_file.getbuffer())
+                        f.write(one_sheet_bytes)
                         
                     one_sheet_updated_df = update_one_sheet(processed_df, temp_os_path, ay_start_year)
                     os_path = os.path.join(base_dir, f"One_Sheet_Updated_AY{str(ay_start_year)[-2:]}-{str(ay_start_year+1)[-2:]}.csv")
                     one_sheet_updated_df.to_csv(os_path, index=False, header=False)
                 
+                # Store everything inside session state
+                st.session_state.processed_df = processed_df
+                st.session_state.raw_df = processed_df['raw_annotated'].copy()
+                st.session_state.semesters = semesters
+                st.session_state.base_dir = base_dir
+                st.session_state.grouping_dir = grouping_dir
+                st.session_state.generated_files = generated_files
+                st.session_state.top_sheet_df = top_sheet_df
+                st.session_state.one_sheet_updated_df = one_sheet_updated_df
+                st.session_state.one_sheet_bytes = one_sheet_bytes
+                
+                st.session_state.ay_start_year = ay_start_year
+                st.session_state.data_processed = True
+                
                 st.success(f"Processing Complete! Files saved locally in `{base_dir}` directory.")
-                
-                # 5. UI Tabs
-                tab1, tab2, tab3 = st.tabs(["Top Sheet Overview", "Grouping Pairs", "One Sheet Update"])
-                
-                with tab1:
-                    st.subheader(f"Top Sheet: AY {ay_start_year}-{ay_start_year+1}")
-                    
-                    # Provide download button for the fully formatted Top Sheet CSV at the top
-                    csv_buffer = io.StringIO()
-                    top_sheet_df.to_csv(csv_buffer, index=False, header=False)
-                    st.download_button(
-                        label="Download Full Top Sheet CSV",
-                        data=csv_buffer.getvalue(),
-                        file_name=f"Top_Sheet_{ay_start_year}-{ay_start_year+1}.csv",
-                        mime="text/csv",
-                        type="primary"
-                    )
-                    
-                    st.divider()
-                    
-                    # High level metrics
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.metric("Total Reservations", len(processed_df['overall']))
-                    with col2:
-                        st.metric("Total Hours", round(processed_df['overall']['Calc Hours'].sum(), 2))
-                        
-                    st.divider()
-                    
-                    # Helper to generate pretty view dataframe from df_pack subsets
-                    def display_top_sheet_section(title, category_col, entity_list, df_target, is_hours=False):
-                        st.markdown(f"**{title}**")
-                        rows = []
-                        for entity in entity_list:
-                            # Reservations and Hours per semester
-                            sem_data = {}
-                            total_qty = 0
-                            for s in semesters:
-                                subset = df_target[(df_target[category_col] == entity) & (df_target['Semester'] == s)]
-                                if not is_hours:
-                                    qty = len(subset)
-                                else:
-                                    qty = round(subset['Calc Hours'].sum(), 2)
-                                sem_data[s] = qty
-                                total_qty += qty
-                            
-                            row_data = {category_col: entity}
-                            row_data.update(sem_data)
-                            row_data['Total'] = round(total_qty, 2) if is_hours else total_qty
-                            rows.append(row_data)
-                            
-                        # Convert to df and display
-                        section_df = pd.DataFrame(rows)
-                        st.dataframe(section_df, use_container_width=True, hide_index=True)
-
-                    st.markdown("### Top Sheet Breakdown")
-                    st.write("Summary totals by Space, Department, and School.")
-                    
-                    df_overall = processed_df['overall']
-                    df_rooms = processed_df['rooms']
-                    df_depts_schools = processed_df['depts_schools']
-                    
-                    # Rooms
-                    room_order = ['1201 Seminar Room', '233 Co-Lab', '230 Audio Lab', '221-224 Ballrooms', '220 Blackbox', '202 Lecture Hall', '103 Garage', '260 Post Production Lab']
-                    rc1, rc2 = st.columns(2)
-                    with rc1: display_top_sheet_section("Reservations per Room", "Clean Room", room_order, df_rooms)
-                    with rc2: display_top_sheet_section("Hours per Room", "Clean Room", room_order, df_rooms, is_hours=True)
-                    
-                    # Programs
-                    prog_order = ['ALT (Ed Leadership, ECT, and Higher and Post Secondary Education)', 'IDM', 'ITP / IMA / Low Res', 'CDI / Recorded Music', 'Music Tech', 'MARL', 'MPAP', 'Game Center', 'Other Group(s)', 'Community Partner']
-                    pc1, pc2 = st.columns(2)
-                    with pc1: display_top_sheet_section("Reservations per Program", "Clean Department", prog_order, df_depts_schools)
-                    with pc2: display_top_sheet_section("Hours per Program", "Clean Department", prog_order, df_depts_schools, is_hours=True)
-                    
-                    # Schools
-                    school_order = ['Tandon', 'Tisch', 'Steinhardt', 'Provost', 'URPA / Community Partner', 'Central', 'Other Schools']
-                    sc1, sc2 = st.columns(2)
-                    with sc1: display_top_sheet_section("Reservations per School", "Clean School", school_order, df_depts_schools)
-                    with sc2: display_top_sheet_section("Hours per School", "Clean School", school_order, df_depts_schools, is_hours=True)
-
-                with tab2:
-                    st.subheader("Generated Grouping Pairs")
-                    st.write("These tables divide the reservations by semester, then by School, Department, or Room:")
-                    
-                    # Organize grouping pairs visually with expanders
-                    for fp in generated_files:
-                        fname = os.path.basename(fp)
-                        # Remove .csv for a cleaner title
-                        clean_title = fname.replace('.csv', '').replace('_', ' ')
-                        with st.expander(f"📄 {clean_title}"):
-                            # Read and display data beautifully
-                            df_group = pd.read_csv(fp)
-                            st.dataframe(df_group, use_container_width=True, hide_index=True)
-                            
-                            # Provide download button below the table
-                            with open(fp, "rb") as f:
-                                st.download_button(
-                                    label=f"Download {fname}",
-                                    data=f,
-                                    file_name=fname,
-                                    mime="text/csv",
-                                    key=fname
-                                )
-                
-                with tab3:
-                    st.subheader("One Sheet Update")
-                    if one_sheet_file is not None and one_sheet_updated_df is not None:
-                        st.write(f"The historic One Sheet has been updated with AY{str(ay_start_year+1)[-2:]} metrics.")
-                        st.dataframe(one_sheet_updated_df)
-                        
-                        csv_buffer_os = io.StringIO()
-                        one_sheet_updated_df.to_csv(csv_buffer_os, index=False, header=False)
-                        st.download_button(
-                            label="Download Updated One Sheet CSV",
-                            data=csv_buffer_os.getvalue(),
-                            file_name=f"One_Sheet_Updated_AY{str(ay_start_year)[-2:]}-{str(ay_start_year+1)[-2:]}.csv",
-                            mime="text/csv"
-                        )
-                    else:
-                        st.write("Please upload the Historic One Sheet CSV in the uploader above to automatically append this year's metrics to it.")
-                        # Currently we show the current year's high level metrics
-                        st.metric("Total Reservations", len(processed_df['overall']))
-                        st.metric("Total Hours", round(processed_df['overall']['Calc Hours'].sum(), 2))
-                    
             except Exception as e:
                 st.error(f"An error occurred: {e}")
+
+# Separate block for tabs, conditional on data being processed
+if st.session_state.data_processed:
+    try:
+        # 5. UI Tabs
+        tab1, tab2, tab3, tab4 = st.tabs(["Top Sheet Overview", "Grouping Pairs", "One Sheet Update", "Filtered Bookings"])
+        
+        processed_df = st.session_state.processed_df
+        semesters = st.session_state.semesters
+        base_dir = st.session_state.base_dir
+        grouping_dir = st.session_state.grouping_dir
+        top_sheet_df = st.session_state.top_sheet_df
+        one_sheet_updated_df = st.session_state.one_sheet_updated_df
+        
+        with tab1:
+            st.subheader(f"Top Sheet: AY {ay_start_year}-{ay_start_year+1}")
+            
+            # Provide download button for the fully formatted Top Sheet CSV at the top
+            csv_buffer = io.StringIO()
+            top_sheet_df.to_csv(csv_buffer, index=False, header=False)
+            st.download_button(
+                label="Download Full Top Sheet CSV",
+                data=csv_buffer.getvalue(),
+                file_name=f"Top_Sheet_{ay_start_year}-{ay_start_year+1}.csv",
+                mime="text/csv",
+                type="primary"
+            )
+            
+            st.divider()
+            
+            # High level metrics
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric("Total Reservations", len(processed_df['overall']))
+            with col2:
+                st.metric("Total Hours", round(processed_df['overall']['Calc Hours'].sum(), 2))
+                
+            st.divider()
+            
+            # Helper to generate pretty view dataframe from df_pack subsets
+            def display_top_sheet_section(title, category_col, entity_list, df_target, is_hours=False):
+                st.markdown(f"**{title}**")
+                rows = []
+                for entity in entity_list:
+                    # Reservations and Hours per semester
+                    sem_data = {}
+                    total_qty = 0
+                    for s in semesters:
+                        subset = df_target[(df_target[category_col] == entity) & (df_target['Semester'] == s)]
+                        if not is_hours:
+                            qty = len(subset)
+                        else:
+                            qty = round(subset['Calc Hours'].sum(), 2)
+                        sem_data[s] = qty
+                        total_qty += qty
+                    
+                    row_data = {category_col: entity}
+                    row_data.update(sem_data)
+                    row_data['Total'] = round(total_qty, 2) if is_hours else total_qty
+                    rows.append(row_data)
+                    
+                # Convert to df and display
+                section_df = pd.DataFrame(rows)
+                st.dataframe(section_df, use_container_width=True, hide_index=True)
+
+            st.markdown("### Top Sheet Breakdown")
+            st.write("Summary totals by Space, Department, and School.")
+            
+            df_overall = processed_df['overall']
+            df_rooms = processed_df['rooms']
+            df_depts_schools = processed_df['depts_schools']
+            
+            # Rooms
+            room_order = ['1201 Seminar Room', '233 Co-Lab', '230 Audio Lab', '221-224 Ballrooms', '220 Blackbox', '202 Lecture Hall', '103 Garage', '260 Post Production Lab']
+            rc1, rc2 = st.columns(2)
+            with rc1: display_top_sheet_section("Reservations per Room", "Clean Room", room_order, df_rooms)
+            with rc2: display_top_sheet_section("Hours per Room", "Clean Room", room_order, df_rooms, is_hours=True)
+            
+            # Programs
+            prog_order = ['ALT (Ed Leadership, ECT, and Higher and Post Secondary Education)', 'IDM', 'ITP / IMA / Low Res', 'CDI / Recorded Music', 'Music Tech', 'MARL', 'MPAP', 'Game Center', 'Other Group(s)', 'Community Partner']
+            pc1, pc2 = st.columns(2)
+            with pc1: display_top_sheet_section("Reservations per Program", "Clean Department", prog_order, df_depts_schools)
+            with pc2: display_top_sheet_section("Hours per Program", "Clean Department", prog_order, df_depts_schools, is_hours=True)
+            
+            # Schools
+            school_order = ['Tandon', 'Tisch', 'Steinhardt', 'Provost', 'URPA / Community Partner', 'Central', 'Other Schools']
+            sc1, sc2 = st.columns(2)
+            with sc1: display_top_sheet_section("Reservations per School", "Clean School", school_order, df_depts_schools)
+            with sc2: display_top_sheet_section("Hours per School", "Clean School", school_order, df_depts_schools, is_hours=True)
+
+        with tab2:
+            st.subheader("Generated Grouping Pairs")
+            st.write("Edit tables below to update quantities. Changes to these tables will automatically update the underlying master data and perfectly synchronize across all other tabs, including the Top Sheet Grand Totals!")
+            
+            def apply_edits_to_raw(edited_df, original_df):
+                changes_made = False
+                changed_mask = edited_df != original_df
+                # Account for NaN equality in pandas
+                changed_mask = changed_mask & ~(edited_df.isna() & original_df.isna())
+                for idx in changed_mask.index[changed_mask.any(axis=1)]:
+                    raw_id = original_df.loc[idx, '_raw_id']
+                    for col in changed_mask.columns[changed_mask.loc[idx]]:
+                        new_val = edited_df.loc[idx, col]
+                        mapped_col = col
+                        if col == 'Clean Department': mapped_col = 'Department'
+                        elif col == 'Clean Room': mapped_col = 'Room(s)'
+                        elif col == 'Clean School': continue # School is derived strictly from Department
+                        elif col == 'Calc Hours': 
+                            mapped_col = 'ACTUAL hours' if 'ACTUAL hours' in st.session_state.raw_df.columns else 'Time In Use, Hours'
+                        
+                        if mapped_col in st.session_state.raw_df.columns:
+                            mask = st.session_state.raw_df['_raw_id'] == raw_id
+                            st.session_state.raw_df.loc[mask, mapped_col] = new_val
+                            changes_made = True
+                return changes_made
+            
+            def get_sem_code(sem_str):
+                if 'Fall' in sem_str: return f'F{sem_str[-2:]}'
+                if 'Winter' in sem_str: return f'W{sem_str[-2:]}'
+                if 'Spring' in sem_str: return f'Sp{sem_str[-2:]}'
+                if 'Summer' in sem_str: return f'Su{sem_str[-2:]}'
+                return 'Other'
+
+            any_changes = False
+            semesters_list = df_overall['Semester'].unique()
+            
+            for sem in semesters_list:
+                if sem == 'Other': continue
+                sem_code = get_sem_code(sem)
+                
+                # Schools Data Editor
+                schools_df = df_depts_schools[df_depts_schools['Semester'] == sem].sort_values(by='Clean School')
+                with st.expander(f"📄 {sem_code} Schools"):
+                    edited_schools = st.data_editor(schools_df, use_container_width=True, hide_index=True, key=f"{sem}_schools")
+                    if not edited_schools.equals(schools_df):
+                        if apply_edits_to_raw(edited_schools, schools_df):
+                            any_changes = True
+                    
+                    # Provide local download hook (just export to buffer for UI)
+                    csv_buf = io.StringIO()
+                    edited_schools.to_csv(csv_buf, index=False)
+                    st.download_button(label=f"Download {sem_code}_Schools.csv", data=csv_buf.getvalue(), file_name=f"{sem_code}_Schools.csv", mime="text/csv", key=f"dl_{sem}_schools")
+                
+                # Depts Data Editor
+                depts_df = df_depts_schools[df_depts_schools['Semester'] == sem].sort_values(by='Clean Department')
+                with st.expander(f"📄 {sem_code} Dpmts"):
+                    edited_depts = st.data_editor(depts_df, use_container_width=True, hide_index=True, key=f"{sem}_dpmts")
+                    if not edited_depts.equals(depts_df):
+                        if apply_edits_to_raw(edited_depts, depts_df):
+                            any_changes = True
+                        
+                    csv_buf = io.StringIO()
+                    edited_depts.to_csv(csv_buf, index=False)
+                    st.download_button(label=f"Download {sem_code}_Dpmts.csv", data=csv_buf.getvalue(), file_name=f"{sem_code}_Dpmts.csv", mime="text/csv", key=f"dl_{sem}_dpmts")
+                        
+                # Rooms Data Editor
+                rooms_df = df_rooms[df_rooms['Semester'] == sem].sort_values(by='Clean Room')
+                with st.expander(f"📄 {sem_code} Rooms"):
+                    edited_rooms = st.data_editor(rooms_df, use_container_width=True, hide_index=True, key=f"{sem}_rooms")
+                    if not edited_rooms.equals(rooms_df):
+                        if apply_edits_to_raw(edited_rooms, rooms_df):
+                            any_changes = True
+                        
+                    csv_buf = io.StringIO()
+                    edited_rooms.to_csv(csv_buf, index=False)
+                    st.download_button(label=f"Download {sem_code}_Rooms.csv", data=csv_buf.getvalue(), file_name=f"{sem_code}_Rooms.csv", mime="text/csv", key=f"dl_{sem}_rooms")
+
+            if any_changes:
+                # 1. Reprocess all data from the modified master raw_df
+                new_processed, new_sems = process_reservations(st.session_state.raw_df, st.session_state.ay_start_year)
+                st.session_state.processed_df = new_processed
+                st.session_state.semesters = new_sems
+                
+                # 2. Regenerate Top Sheet
+                new_top_sheet = generate_top_sheet(new_processed, st.session_state.ay_start_year, new_sems)
+                st.session_state.top_sheet_df = new_top_sheet
+                
+                # 3. Re-export CSV files silently to keep the local disk cache synced
+                export_grouping_pairs(new_processed, st.session_state.grouping_dir)
+                ts_local_path = os.path.join(st.session_state.base_dir, f"Top_Sheet_{st.session_state.ay_start_year}-{st.session_state.ay_start_year+1}.csv")
+                new_top_sheet.to_csv(ts_local_path, index=False, header=False)
+                
+                # 4. Regenerate One Sheet if it was provided
+                if st.session_state.one_sheet_bytes is not None:
+                    temp_os_path = os.path.join(st.session_state.base_dir, "temp_one_sheet.csv")
+                    with open(temp_os_path, "wb") as f:
+                        f.write(st.session_state.one_sheet_bytes)
+                    new_os_updated = update_one_sheet(new_processed, temp_os_path, st.session_state.ay_start_year)
+                    st.session_state.one_sheet_updated_df = new_os_updated
+                    os_path = os.path.join(st.session_state.base_dir, f"One_Sheet_Updated_AY{str(st.session_state.ay_start_year)[-2:]}-{str(st.session_state.ay_start_year+1)[-2:]}.csv")
+                    new_os_updated.to_csv(os_path, index=False, header=False)
+
+                st.rerun()
+
+        with tab3:
+            st.subheader("One Sheet Update")
+            if one_sheet_updated_df is not None:
+                st.write(f"The historic One Sheet has been updated with AY{str(ay_start_year+1)[-2:]} metrics.")
+                st.dataframe(one_sheet_updated_df)
+                
+                csv_buffer_os = io.StringIO()
+                one_sheet_updated_df.to_csv(csv_buffer_os, index=False, header=False)
+                st.download_button(
+                    label="Download Updated One Sheet CSV",
+                    data=csv_buffer_os.getvalue(),
+                    file_name=f"One_Sheet_Updated_AY{str(ay_start_year)[-2:]}-{str(ay_start_year+1)[-2:]}.csv",
+                    mime="text/csv"
+                )
+            else:
+                st.write("Please upload the Historic One Sheet CSV in the uploader above to automatically append this year's metrics to it.")
+                # Currently we show the current year's high level metrics
+                st.metric("Total Reservations", len(processed_df['overall']))
+                st.metric("Total Hours", round(processed_df['overall']['Calc Hours'].sum(), 2))
+
+        with tab4:
+            st.subheader("Raw Data & Filtering")
+            st.write("Below is the original imported data. Bookings filtered out are indicated in the `Filtered Out` and `Filter Reason` columns.")
+            
+            raw_df = st.session_state.processed_df.get('raw_annotated')
+            if raw_df is not None:
+                filtered_out_count = raw_df['Filtered Out'].sum()
+                st.write(f"There are **{filtered_out_count}** bookings filtered out.")
+                
+                # Highlight rows that were filtered out
+                def highlight_filtered(row):
+                    color = 'background-color: rgba(255, 99, 71, 0.3)' if row['Filtered Out'] else ''
+                    return [color] * len(row)
+                
+                st.dataframe(raw_df.style.apply(highlight_filtered, axis=1), use_container_width=True)
+            else:
+                st.write("No raw annotated data available. Please re-process the file.")
+                
+    except Exception as e:
+        st.error(f"An error occurred while generating tabs: {e}")
