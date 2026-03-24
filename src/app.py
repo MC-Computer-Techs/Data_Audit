@@ -190,6 +190,7 @@ if st.session_state.data_processed:
                 changed_mask = changed_mask & ~(edited_df.isna() & original_df.isna())
                 for idx in changed_mask.index[changed_mask.any(axis=1)]:
                     raw_id = original_df.loc[idx, '_raw_id']
+                    time_edited = False
                     for col in changed_mask.columns[changed_mask.loc[idx]]:
                         new_val = edited_df.loc[idx, col]
                         mapped_col = col
@@ -199,10 +200,28 @@ if st.session_state.data_processed:
                         elif col == 'Calc Hours': 
                             mapped_col = 'ACTUAL hours' if 'ACTUAL hours' in st.session_state.raw_df.columns else 'Time In Use, Hours'
                         
+                        if mapped_col in ['Booking Start Date', 'Booking End Date', 'Booking Start Time', 'Booking End Time']:
+                            time_edited = True
+                            
                         if mapped_col in st.session_state.raw_df.columns:
                             mask = st.session_state.raw_df['_raw_id'] == raw_id
                             st.session_state.raw_df.loc[mask, mapped_col] = new_val
                             changes_made = True
+                            
+                    if time_edited:
+                        mask = st.session_state.raw_df['_raw_id'] == raw_id
+                        row_data = st.session_state.raw_df.loc[mask].iloc[0]
+                        try:
+                            start_str = str(row_data.get('Booking Start Date', '')).split(' ')[0] + " " + str(row_data.get('Booking Start Time', ''))
+                            end_str = str(row_data.get('Booking End Date', '')).split(' ')[0] + " " + str(row_data.get('Booking End Time', ''))
+                            start_dt = pd.to_datetime(start_str)
+                            end_dt = pd.to_datetime(end_str)
+                            hours_diff = (end_dt - start_dt).total_seconds() / 3600.0
+                            
+                            hours_col = 'ACTUAL hours' if 'ACTUAL hours' in st.session_state.raw_df.columns else 'Time In Use, Hours'
+                            st.session_state.raw_df.loc[mask, hours_col] = max(0, hours_diff)
+                        except Exception:
+                            pass
                 return changes_made
             
             def get_sem_code(sem_str):
@@ -215,6 +234,8 @@ if st.session_state.data_processed:
             any_changes = False
             semesters_list = df_overall['Semester'].unique()
             
+            disabled_hours_cols = [c for c in ['Calc Hours', 'ACTUAL hours', 'Time In Use, Hours'] if c in df_overall.columns]
+            
             for sem in semesters_list:
                 if sem == 'Other': continue
                 sem_code = get_sem_code(sem)
@@ -222,7 +243,7 @@ if st.session_state.data_processed:
                 # Schools Data Editor
                 schools_df = df_depts_schools[df_depts_schools['Semester'] == sem].sort_values(by='Clean School')
                 with st.expander(f"📄 {sem_code} Schools"):
-                    edited_schools = st.data_editor(schools_df, use_container_width=True, hide_index=True, key=f"{sem}_schools")
+                    edited_schools = st.data_editor(schools_df, use_container_width=True, hide_index=True, key=f"{sem}_schools", disabled=disabled_hours_cols)
                     if not edited_schools.equals(schools_df):
                         if apply_edits_to_raw(edited_schools, schools_df):
                             any_changes = True
@@ -235,7 +256,7 @@ if st.session_state.data_processed:
                 # Depts Data Editor
                 depts_df = df_depts_schools[df_depts_schools['Semester'] == sem].sort_values(by='Clean Department')
                 with st.expander(f"📄 {sem_code} Dpmts"):
-                    edited_depts = st.data_editor(depts_df, use_container_width=True, hide_index=True, key=f"{sem}_dpmts")
+                    edited_depts = st.data_editor(depts_df, use_container_width=True, hide_index=True, key=f"{sem}_dpmts", disabled=disabled_hours_cols)
                     if not edited_depts.equals(depts_df):
                         if apply_edits_to_raw(edited_depts, depts_df):
                             any_changes = True
@@ -247,7 +268,7 @@ if st.session_state.data_processed:
                 # Rooms Data Editor
                 rooms_df = df_rooms[df_rooms['Semester'] == sem].sort_values(by='Clean Room')
                 with st.expander(f"📄 {sem_code} Rooms"):
-                    edited_rooms = st.data_editor(rooms_df, use_container_width=True, hide_index=True, key=f"{sem}_rooms")
+                    edited_rooms = st.data_editor(rooms_df, use_container_width=True, hide_index=True, key=f"{sem}_rooms", disabled=disabled_hours_cols)
                     if not edited_rooms.equals(rooms_df):
                         if apply_edits_to_raw(edited_rooms, rooms_df):
                             any_changes = True
