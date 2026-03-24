@@ -50,19 +50,19 @@ def extract_departments(row):
     # Existing department parsing
     if not pd.isna(row.get('Department')) and dept_str.strip() not in ['', 'nan', 'Other']:
         depts.add(clean_department(dept_str))
+    else:    
+        # Infer missing or additional from title
+        if 'itp' in title or 'ima' in title or 'low res' in title: depts.add('ITP / IMA / Low Res')
+        if 'idm' in title or 'tcs' in title: depts.add('IDM')
+        if 'music tech' in title or 'mtech' in title: depts.add('Music Tech')
+        if 'marl ' in title or 'marl_' in title or 'marl-' in title: depts.add('MARL')
+        if 'cdi ' in title or 'recorded music' in title or 'clive' in title: depts.add('CDI / Recorded Music')
+        if 'game center' in title: depts.add('Game Center')
+        if 'mpap ' in title: depts.add('MPAP')
+        if 'alt ' in title or 'alt-' in title or 'ect ' in title: depts.add('ALT (Ed Leadership, ECT, and Higher and Post Secondary Education)')
         
-    # Infer missing or additional from title
-    if 'itp' in title or 'ima' in title or 'low res' in title: depts.add('ITP / IMA / Low Res')
-    if 'idm' in title: depts.add('IDM')
-    if 'music tech' in title or 'mtech' in title: depts.add('Music Tech')
-    if 'marl ' in title or 'marl_' in title or 'marl-' in title: depts.add('MARL')
-    if 'cdi ' in title or 'recorded music' in title or 'clive' in title: depts.add('CDI / Recorded Music')
-    if 'game center' in title: depts.add('Game Center')
-    if 'mpap ' in title: depts.add('MPAP')
-    if 'alt ' in title or 'alt-' in title or 'ect ' in title: depts.add('ALT (Ed Leadership, ECT, and Higher and Post Secondary Education)')
-    
-    if len(depts) == 0:
-        depts.add('Other Group(s)')
+        if len(depts) == 0:
+            depts.add('Other Group(s)')
         
     return list(depts)
 
