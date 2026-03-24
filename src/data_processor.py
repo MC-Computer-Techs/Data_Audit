@@ -3,6 +3,7 @@ import numpy as np
 import os
 import csv
 from pathlib import Path
+import re
 
 ROOM_MAPPING = {
     '1201': '1201 Seminar Room',
@@ -51,20 +52,24 @@ def extract_departments(row):
     if not pd.isna(row.get('Department')) and dept_str.strip() not in ['', 'nan', 'Other']:
         depts.add(clean_department(dept_str))
     else:    
+        #re.search(pattern, main_string, re.IGNORECASE):
         # Infer missing or additional from title
-        if 'itp' in title or 'ima' in title or 'low res' in title: depts.add('ITP / IMA / Low Res')
-        if 'idm' in title or 'tcs' in title: depts.add('IDM')
-        if 'music tech' in title or 'mtech' in title: depts.add('Music Tech')
-        if 'marl ' in title or 'marl_' in title or 'marl-' in title: depts.add('MARL')
-        if 'cdi ' in title or 'recorded music' in title or 'clive' in title: depts.add('CDI / Recorded Music')
-        if 'game center' in title: depts.add('Game Center')
-        if 'mpap ' in title: depts.add('MPAP')
-        if 'alt ' in title or 'alt-' in title or 'ect ' in title: depts.add('ALT (Ed Leadership, ECT, and Higher and Post Secondary Education)')
+        if word_in_title('itp', title) or word_in_title('ima', title) or word_in_title('low res', title): depts.add('ITP / IMA / Low Res')
+        if word_in_title('idm', title) or word_in_title('tcs', title): depts.add('IDM')
+        if word_in_title('music tech', title) or word_in_title('mtech', title): depts.add('Music Tech')
+        if word_in_title('marl', title) or word_in_title('marl_', title) or word_in_title('marl-', title): depts.add('MARL')
+        if word_in_title('cdi', title) or word_in_title('recorded music', title) or word_in_title('clive', title): depts.add('CDI / Recorded Music')
+        if word_in_title('game center', title): depts.add('Game Center')
+        if word_in_title('mpap', title): depts.add('MPAP')
+        if word_in_title('alt', title) or word_in_title('alt-', title) or word_in_title('ect', title): depts.add('ALT (Ed Leadership, ECT, and Higher and Post Secondary Education)')
         
         if len(depts) == 0:
             depts.add('Other Group(s)')
         
     return list(depts)
+
+def word_in_title(word, title):
+    return re.search(r"\b" + re.escape(word) + r"\b", title, re.IGNORECASE)
 
 def map_school(dept_str, school_str, title_str=""):
     d = clean_department(dept_str)
