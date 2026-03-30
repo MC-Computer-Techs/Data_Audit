@@ -4,9 +4,9 @@ import os
 import io
 import datetime
 try:
-    from src.data_processor import process_reservations, export_grouping_pairs, generate_top_sheet, update_one_sheet
+    from src.data_processor import process_reservations, export_grouping_pairs, generate_top_sheet, update_one_sheet, export_to_excel, process_excel_import
 except ImportError:
-    from data_processor import process_reservations, export_grouping_pairs, generate_top_sheet, update_one_sheet
+    from data_processor import process_reservations, export_grouping_pairs, generate_top_sheet, update_one_sheet, export_to_excel, process_excel_import
 
 st.set_page_config(page_title="Data Audit Tool", layout="wide")
 
@@ -15,26 +15,29 @@ st.markdown("Upload the Booking Tool reservations CSV file to generate Grouping 
 
 ay_start_year = st.number_input("Academic Year Starting Year (e.g., 2024 for AY24-25)", min_value=2015, max_value=2050, value=2024)
 
-col1, col2 = st.columns(2)
+col1, col2, col3 = st.columns(3)
 with col1:
-    uploaded_file = st.file_uploader("Upload 'Booking Tool Reservations' CSV", type=['csv'])
+    uploaded_file = st.file_uploader("Upload 'Booking Tool' CSV", type=['csv'])
 with col2:
-    one_sheet_file = st.file_uploader("Upload Historic 'One Sheet' CSV (Optional)", type=['csv'])
+    excel_file = st.file_uploader("Upload Existing Excel Audit", type=['xlsx'])
+with col3:
+    one_sheet_file = st.file_uploader("Upload Historic 'One Sheet' (Optional)", type=['csv'])
 
 if 'data_processed' not in st.session_state:
     st.session_state.data_processed = False
 
-if uploaded_file is not None:
+if uploaded_file is not None or excel_file is not None:
     st.success("File uploaded successfully!")
     
     if st.button("Process Data"):
         with st.spinner("Processing data..."):
             try:
-                # 1. Read input
-                df = pd.read_csv(uploaded_file)
-                
-                # 2. Process to add Semesters, Room/Dept/School clean
-                processed_df, semesters = process_reservations(df, ay_start_year)
+                # 1. Read input and Process
+                if excel_file is not None:
+                    processed_df, semesters = process_excel_import(excel_file, ay_start_year)
+                else:
+                    df = pd.read_csv(uploaded_file)
+                    processed_df, semesters = process_reservations(df, ay_start_year)
                 
                 # 3. Create outputs directory
                 base_dir = f"{ay_start_year}-{ay_start_year+1}_Data_Audit"
@@ -109,13 +112,27 @@ if st.session_state.data_processed:
             # Provide download button for the fully formatted Top Sheet CSV at the top
             csv_buffer = io.StringIO()
             top_sheet_df.to_csv(csv_buffer, index=False, header=False)
-            st.download_button(
-                label="Download Full Top Sheet CSV",
-                data=csv_buffer.getvalue(),
-                file_name=f"Top_Sheet_{ay_start_year}-{ay_start_year+1}.csv",
-                mime="text/csv",
-                type="primary"
-            )
+            
+            c1, c2 = st.columns(2)
+            with c1:
+                st.download_button(
+                    label="Download Full Top Sheet CSV",
+                    data=csv_buffer.getvalue(),
+                    file_name=f"Top_Sheet_{ay_start_year}-{ay_start_year+1}.csv",
+                    mime="text/csv",
+                    type="primary"
+                )
+            
+            with c2:
+                # Excel export logic
+                excel_buf = export_to_excel(processed_df, ay_start_year, top_sheet_df, semesters)
+                st.download_button(
+                    label="Download Full Audit (Excel)",
+                    data=excel_buf.getvalue(),
+                    file_name=f"Data_Audit_{ay_start_year}-{ay_start_year+1}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    type="primary"
+                )
             
             st.divider()
             

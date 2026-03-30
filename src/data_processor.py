@@ -4,6 +4,7 @@ import os
 import csv
 from pathlib import Path
 import re
+import io
 
 ROOM_MAPPING = {
     '1201': '1201 Seminar Room',
@@ -393,6 +394,116 @@ def update_one_sheet(df_pack, one_sheet_path, ay_start_year):
             output_lines.append(new_row)
             
         i += 1
-        
+            
     updated_df = pd.DataFrame(output_lines)
     return updated_df
+
+def export_to_excel(df_pack, ay_start_year, top_sheet_df, semesters):
+    """
+    Export the full data audit to an Excel file represented as a BytesIO buffer.
+    """
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine='xlsxwriter') as writer:
+        # Sheet 1: Top Sheet
+        top_sheet_df.to_excel(writer, sheet_name='Top Sheet', index=False, header=False)
+        worksheet = writer.sheets['Top Sheet']
+        worksheet.set_column(0, 0, 40)
+        worksheet.set_column(1, 5, 20)
+        
+        # Sheet 2: Raw Data (Hidden)
+        raw_df = df_pack['raw_annotated'].copy()
+        raw_df.to_excel(writer, sheet_name='Raw Data', index=False)
+        writer.sheets['Raw Data'].hide()
+        
+        # Grouping Pairs Sheets
+        df_depts_schools = df_pack['depts_schools']
+        df_rooms = df_pack['rooms']
+        semesters_list = df_pack['overall']['Semester'].unique()
+        
+        for sem in semesters_list:
+            if sem == 'Other': continue
+            sem_code = get_semester_code(sem)
+            
+            schools_df = df_depts_schools[df_depts_schools['Semester'] == sem].sort_values(by='Clean School')
+            schools_df.to_excel(writer, sheet_name=f"{sem_code}_Schools", index=False)
+            
+            depts_df = df_depts_schools[df_depts_schools['Semester'] == sem].sort_values(by='Clean Department')
+            depts_df.to_excel(writer, sheet_name=f"{sem_code}_Dpmts", index=False)
+            
+            rooms_df = df_rooms[df_rooms['Semester'] == sem].sort_values(by='Clean Room')
+            rooms_df.to_excel(writer, sheet_name=f"{sem_code}_Rooms", index=False)
+            
+    buf.seek(0)
+    return buf
+
+def process_excel_import(uploaded_file, ay_start_year):
+    """
+    Process an uploaded Excel file, applying any edits made in the grouping sheets
+    back to the raw data, and process it entirely.
+    """
+    xls = pd.ExcelFile(uploaded_file)
+    sheet_names = xls.sheet_names
+    
+    raw_df = pd.read_excel(uploaded_file, sheet_name='Raw Data')
+    # Pandas read_excel handles datetimes well but coerce to be safe on main cols
+    raw_df['Booking Start Date'] = pd.to_datetime(raw_df['Booking Start Date'], errors='coerce')
+    raw_df['Booking End Date'] = pd.to_datetime(raw_df['Booking End Date'], errors='coerce')
+    
+    for sheet in sheet_names:
+        if sheet in ['Top Sheet', 'Raw Data']: continue
+        
+        edited_df = pd.read_excel(uploaded_file, sheet_name=sheet)
+        if '_raw_id' not in edited_df.columns:
+            continue
+            
+        temp_pack, _ = process_reservations(raw_df, ay_start_year)
+        
+        if '_Schools' in sheet: original_df = temp_pack['depts_schools']
+        elif '_Dpmts' in sheet: original_df = temp_pack['depts_schools']
+        elif '_Rooms' in sheet: original_df = temp_pack['rooms']
+        else: continue
+            
+        edited_df = edited_df.sort_values('_raw_id').reset_index(drop=True)
+        orig_subset = original_df[original_df['_raw_id'].isin(edited_df['_raw_id'])].sort_values('_raw_id').reset_index(drop=True)
+        
+        # To avoid issues with float nan vs empty string, filling na before diff might be safer or using the same na comparison
+        if len(edited_df) == len(orig_subset):
+            changed_mask = edited_df != orig_subset
+            changed_mask = changed_mask & ~(edited_df.isna() & orig_subset.isna())
+            
+            for idx in changed_mask.index[changed_mask.any(axis=1)]:
+                raw_id = orig_subset.loc[idx, '_raw_id']
+                time_edited = False
+                for col in changed_mask.columns[changed_mask.loc[idx]]:
+                    new_val = edited_df.loc[idx, col]
+                    mapped_col = col
+                    if col == 'Clean Department': mapped_col = 'Department'
+                    elif col == 'Clean Room': mapped_col = 'Room(s)'
+                    elif col == 'Clean School': continue
+                    elif col == 'Calc Hours':
+                        mapped_col = 'ACTUAL hours' if 'ACTUAL hours' in raw_df.columns else 'Time In Use, Hours'
+                    
+                    if mapped_col in ['Booking Start Date', 'Booking End Date', 'Booking Start Time', 'Booking End Time']:
+                        time_edited = True
+                        
+                    if mapped_col in raw_df.columns:
+                        mask = raw_df['_raw_id'] == raw_id
+                        raw_df.loc[mask, mapped_col] = new_val
+                        
+                if time_edited:
+                    mask = raw_df['_raw_id'] == raw_id
+                    row_data = raw_df.loc[mask].iloc[0]
+                    try:
+                        start_str = str(row_data.get('Booking Start Date', '')).split(' ')[0] + " " + str(row_data.get('Booking Start Time', ''))
+                        end_str = str(row_data.get('Booking End Date', '')).split(' ')[0] + " " + str(row_data.get('Booking End Time', ''))
+                        start_dt = pd.to_datetime(start_str)
+                        end_dt = pd.to_datetime(end_str)
+                        hours_diff = (end_dt - start_dt).total_seconds() / 3600.0
+                        
+                        hours_col = 'ACTUAL hours' if 'ACTUAL hours' in raw_df.columns else 'Time In Use, Hours'
+                        raw_df.loc[mask, hours_col] = max(0, hours_diff)
+                    except Exception:
+                        pass
+                        
+    final_pack, final_sems = process_reservations(raw_df, ay_start_year)
+    return final_pack, final_sems

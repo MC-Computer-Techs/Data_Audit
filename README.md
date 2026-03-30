@@ -43,12 +43,20 @@ This application takes the raw reservations export (`All_BT_Reservations.csv`) a
 6. The application will open in your browser automatically.
 7. Upload the raw data CSV and (optionally) the historic `One Sheet`.
 
-## Editable Grouping Pairs
+## Editable Grouping Pairs & Offline Excel Support
 
 Once the data is processed, you can view the detailed grouping pairs in the **Grouping Pairs** tab. These tables are now fully interactive:
-- You can directly edit the values (e.g., `Clean School`, `Calc Hours`) within the Grouping Pairs tables.
+- You can directly edit the values (e.g., `Clean School`, `Calc Hours`) within the Grouping Pairs tables via the Streamlit UI.
 - Any changes made will automatically re-calculate the **Top Sheet Overview** to reflect the updated metrics.
 - The underlying CSV files for both the Grouping Pairs and the Top Sheet are automatically re-exported to your local directory.
+
+### Offline Excel Support
+If you prefer offline editing:
+1. Process your initial Booking Tool CSV file.
+2. Under the "Top Sheet Overview" tab, click **Download Full Audit (Excel)** to generate an `.xlsx` copy of your entire audit.
+3. Open this Excel file natively using Microsoft Excel or Apple Numbers. You'll find a clear Top Sheet, along with individual editable tabs per Grouping Pair.
+4. Modify any grouping pair (e.g., adjust rows in `F24_Schools`).
+5. Upload this modified `.xlsx` file into the new **Upload Existing Excel Audit** box at the top of the app and click "Process Data". The app will automatically sync your offline changes back into its core engine and update all internal totals!
 
 ## Data Filtering & Calculation Rules
 
