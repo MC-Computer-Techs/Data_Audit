@@ -4,9 +4,9 @@ import os
 import io
 import datetime
 try:
-    from src.data_processor import process_reservations, export_grouping_pairs, generate_top_sheet, update_one_sheet, export_to_excel, process_excel_import
+    from src.data_processor import process_reservations, export_grouping_pairs, generate_top_sheet, update_one_sheet, export_to_excel, process_excel_import, export_to_pdf
 except ImportError:
-    from data_processor import process_reservations, export_grouping_pairs, generate_top_sheet, update_one_sheet, export_to_excel, process_excel_import
+    from data_processor import process_reservations, export_grouping_pairs, generate_top_sheet, update_one_sheet, export_to_excel, process_excel_import, export_to_pdf
 
 st.set_page_config(page_title="Data Audit Tool", layout="wide")
 
@@ -113,7 +113,7 @@ if st.session_state.data_processed:
             csv_buffer = io.StringIO()
             top_sheet_df.to_csv(csv_buffer, index=False, header=False)
             
-            c1, c2 = st.columns(2)
+            c1, c2, c3 = st.columns(3)
             with c1:
                 st.download_button(
                     label="Download Full Top Sheet CSV",
@@ -131,6 +131,17 @@ if st.session_state.data_processed:
                     data=excel_buf.getvalue(),
                     file_name=f"Data_Audit_{ay_start_year}-{ay_start_year+1}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    type="primary"
+                )
+                
+            with c3:
+                # PDF export logic
+                pdf_buf = export_to_pdf(processed_df, ay_start_year, top_sheet_df, semesters, one_sheet_updated_df)
+                st.download_button(
+                    label="Download Full Audit (PDF)",
+                    data=pdf_buf.getvalue(),
+                    file_name=f"Data_Audit_{ay_start_year}-{ay_start_year+1}.pdf",
+                    mime="application/pdf",
                     type="primary"
                 )
             
@@ -229,14 +240,41 @@ if st.session_state.data_processed:
                         mask = st.session_state.raw_df['_raw_id'] == raw_id
                         row_data = st.session_state.raw_df.loc[mask].iloc[0]
                         try:
-                            start_str = str(row_data.get('Booking Start Date', '')).split(' ')[0] + " " + str(row_data.get('Booking Start Time', ''))
-                            end_str = str(row_data.get('Booking End Date', '')).split(' ')[0] + " " + str(row_data.get('Booking End Time', ''))
-                            start_dt = pd.to_datetime(start_str)
-                            end_dt = pd.to_datetime(end_str)
-                            hours_diff = (end_dt - start_dt).total_seconds() / 3600.0
+                            s_date = pd.to_datetime(row_data.get('Booking Start Date', pd.NaT))
+                            e_date = pd.to_datetime(row_data.get('Booking End Date', pd.NaT))
                             
-                            hours_col = 'ACTUAL hours' if 'ACTUAL hours' in st.session_state.raw_df.columns else 'Time In Use, Hours'
-                            st.session_state.raw_df.loc[mask, hours_col] = max(0, hours_diff)
+                            dummy_date = "2000-01-01 "
+                            start_time_str = str(row_data.get('Booking Start Time', '00:00'))
+                            end_time_str = str(row_data.get('Booking End Time', '00:00'))
+                            start_dt = pd.to_datetime(dummy_date + start_time_str, errors='coerce')
+                            end_dt = pd.to_datetime(dummy_date + end_time_str, errors='coerce')
+                            
+                            if not pd.isna(start_dt) and not pd.isna(end_dt):
+                                hours_diff = (end_dt - start_dt).total_seconds() / 3600.0
+                                
+                                if hours_diff < 0:
+                                    hours_diff += 24.0
+                                    days_correction = 0
+                                else:
+                                    days_correction = 1
+                                    
+                                if pd.isna(s_date) or pd.isna(e_date):
+                                    days = 1
+                                else:
+                                    days = max(1, (e_date - s_date).days + days_correction)
+                                    
+                                rooms_val = pd.to_numeric(row_data.get('# rooms used', 1), errors='coerce')
+                                if pd.isna(rooms_val) or rooms_val < 1: rooms_val = 1
+                                
+                                hours_diff = min(hours_diff, 12.0)
+                                total_hours = max(0, hours_diff) * days * rooms_val
+                            else:
+                                total_hours = 0
+                                
+                            cols_to_update = [c for c in ['ACTUAL hours', 'Time In Use, Hours'] if c in st.session_state.raw_df.columns]
+                            if not cols_to_update: cols_to_update = ['ACTUAL hours']
+                            for c in cols_to_update:
+                                st.session_state.raw_df.loc[mask, c] = total_hours
                         except Exception:
                             pass
                 return changes_made

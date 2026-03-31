@@ -58,6 +58,11 @@ If you prefer offline editing:
 4. Modify any grouping pair (e.g., adjust rows in `F24_Schools`).
 5. Upload this modified `.xlsx` file into the new **Upload Existing Excel Audit** box at the top of the app and click "Process Data". The app will automatically sync your offline changes back into its core engine and update all internal totals!
 
+### Nicely Formatted PDF Export
+You can also generate a nicely formatted, highly polished PDF version of your Top Sheet, Grouping Pairs, and updated One Sheet.
+1. Process your initial Booking Tool CSV file.
+2. Under the "Top Sheet Overview" tab, click **Download Full Audit (PDF)** to generate the PDF report, which includes shaded tables, clear gridlines, and bold headers to present clean analytics.
+
 ## Data Filtering & Calculation Rules
 
 Based on the required reporting rules, the application alters the raw data mathematically:

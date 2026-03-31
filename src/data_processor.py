@@ -6,6 +6,11 @@ from pathlib import Path
 import re
 import io
 
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import landscape, letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+
 ROOM_MAPPING = {
     '1201': '1201 Seminar Room',
     '233': '233 Co-Lab',
@@ -147,6 +152,60 @@ def process_reservations(df, ay_start_year):
     df_raw = df.copy()
     if '_raw_id' not in df_raw.columns:
         df_raw['_raw_id'] = range(len(df_raw))
+        
+        # FIX NATIVE CSV HOURS ON INITIAL IMPORT
+        cols_to_fix = [c for c in ['ACTUAL hours', 'Time In Use, Hours'] if c in df_raw.columns]
+        if not cols_to_fix:
+            cols_to_fix = ['ACTUAL hours']
+            df_raw['ACTUAL hours'] = 0.0
+            
+        time_cols = ['Booking Start Date', 'Booking End Date', 'Booking Start Time', 'Booking End Time']
+        if all(col in df_raw.columns for col in time_cols):
+            for idx in df_raw.index:
+                try:
+                    s_date = pd.to_datetime(df_raw.at[idx, 'Booking Start Date'], errors='coerce')
+                    e_date = pd.to_datetime(df_raw.at[idx, 'Booking End Date'], errors='coerce')
+                    if pd.isna(s_date) or pd.isna(e_date):
+                        days = 1
+                    else:
+                        days = max(1, (e_date - s_date).days + 1)
+                        
+                    start_time_str = str(df_raw.at[idx, 'Booking Start Time'])
+                    end_time_str = str(df_raw.at[idx, 'Booking End Time'])
+                    
+                    if start_time_str != 'nan' and end_time_str != 'nan':
+                        dummy_date = "2000-01-01 "
+                        start_dt = pd.to_datetime(dummy_date + start_time_str, errors='coerce')
+                        end_dt = pd.to_datetime(dummy_date + end_time_str, errors='coerce')
+                        
+                        if pd.notna(start_dt) and pd.notna(end_dt):
+                            hours_diff = (end_dt - start_dt).total_seconds() / 3600.0
+                            
+                            if hours_diff < 0:
+                                hours_diff += 24.0
+                                days_correction = 0
+                            else:
+                                days_correction = 1
+                                
+                            if pd.isna(s_date) or pd.isna(e_date):
+                                days = 1
+                            else:
+                                days = max(1, (e_date - s_date).days + days_correction)
+                                
+                            rooms_val = pd.to_numeric(df_raw.at[idx, '# rooms used'], errors='coerce')
+                            if pd.isna(rooms_val) or rooms_val < 1: rooms_val = 1
+                            
+                            hours_diff = (end_dt - start_dt).total_seconds() / 3600.0
+                            if hours_diff < 0: hours_diff += 24.0
+                            
+                            # Enforce the strict 12-hour daily maximum per room natively
+                            hours_diff = min(hours_diff, 12.0)
+                            
+                            total_hours = max(0, hours_diff) * days * rooms_val
+                            for fix_col in cols_to_fix:
+                                df_raw.at[idx, fix_col] = float(total_hours)
+                except Exception:
+                    pass
     
     # Track filter reasons
     df_raw['Filtered Out'] = False
@@ -494,16 +553,290 @@ def process_excel_import(uploaded_file, ay_start_year):
                     mask = raw_df['_raw_id'] == raw_id
                     row_data = raw_df.loc[mask].iloc[0]
                     try:
-                        start_str = str(row_data.get('Booking Start Date', '')).split(' ')[0] + " " + str(row_data.get('Booking Start Time', ''))
-                        end_str = str(row_data.get('Booking End Date', '')).split(' ')[0] + " " + str(row_data.get('Booking End Time', ''))
-                        start_dt = pd.to_datetime(start_str)
-                        end_dt = pd.to_datetime(end_str)
-                        hours_diff = (end_dt - start_dt).total_seconds() / 3600.0
+                        s_date = pd.to_datetime(row_data.get('Booking Start Date', pd.NaT))
+                        e_date = pd.to_datetime(row_data.get('Booking End Date', pd.NaT))
+                        if pd.isna(s_date) or pd.isna(e_date):
+                            days = 1
                         
-                        hours_col = 'ACTUAL hours' if 'ACTUAL hours' in raw_df.columns else 'Time In Use, Hours'
-                        raw_df.loc[mask, hours_col] = max(0, hours_diff)
+                        dummy_date = "2000-01-01 "
+                        start_time_str = str(row_data.get('Booking Start Time', '00:00'))
+                        end_time_str = str(row_data.get('Booking End Time', '00:00'))
+                        start_dt = pd.to_datetime(dummy_date + start_time_str, errors='coerce')
+                        end_dt = pd.to_datetime(dummy_date + end_time_str, errors='coerce')
+                        
+                        if not pd.isna(start_dt) and not pd.isna(end_dt):
+                            hours_diff = (end_dt - start_dt).total_seconds() / 3600.0
+                            
+                            if hours_diff < 0:
+                                hours_diff += 24.0
+                                days_correction = 0
+                            else:
+                                days_correction = 1
+                                
+                            if pd.isna(s_date) or pd.isna(e_date):
+                                days = 1
+                            else:
+                                days = max(1, (e_date - s_date).days + days_correction)
+                                
+                            rooms_val = pd.to_numeric(row_data.get('# rooms used', 1), errors='coerce')
+                            if pd.isna(rooms_val) or rooms_val < 1: rooms_val = 1
+                            
+                            hours_diff = min(hours_diff, 12.0)
+                            total_hours = max(0, hours_diff) * days * rooms_val
+                        else:
+                            total_hours = 0
+                            
+                        cols_to_update = [c for c in ['ACTUAL hours', 'Time In Use, Hours'] if c in raw_df.columns]
+                        if not cols_to_update: cols_to_update = ['ACTUAL hours']
+                        for c in cols_to_update:
+                            raw_df.loc[mask, c] = total_hours
                     except Exception:
                         pass
                         
     final_pack, final_sems = process_reservations(raw_df, ay_start_year)
     return final_pack, final_sems
+
+def export_to_pdf(df_pack, ay_start_year, top_sheet_df, semesters, one_sheet_df=None):
+    """
+    Export the full data audit to a beautifully formatted PDF buffer using ReportLab.
+    """
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=landscape(letter),
+        rightMargin=40, leftMargin=40, topMargin=40, bottomMargin=40
+    )
+    elements = []
+    
+    styles = getSampleStyleSheet()
+    title_style = styles['Title']
+    h2_style = styles['Heading2']
+    h3_style = styles['Heading3']
+    
+    # --- 1. Top Sheet ---
+    elements.append(Paragraph(f"Data Audit Report: AY{str(ay_start_year)[-2:]}-{str(ay_start_year+1)[-2:]}", title_style))
+    elements.append(Spacer(1, 20))
+    
+    ts_data = top_sheet_df.fillna("").astype(str).values.tolist()
+    
+    # Styles for the first column to handle text-wrapping and indentation
+    ts_cell_style = ParagraphStyle(
+        'TS_Cell',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=10,
+        leading=12,
+        leftIndent=10  # Indent the typical rows
+    )
+    
+    ts_bold_style = ParagraphStyle(
+        'TS_Bold',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=10,
+        leading=12,
+        leftIndent=0,
+        textColor=colors.black
+    )
+    
+    ts_header_style = ParagraphStyle(
+        'TS_Header',
+        parent=styles['Normal'],
+        fontName='Helvetica-Bold',
+        fontSize=10,
+        leading=12,
+        leftIndent=0,
+        textColor=colors.whitesmoke,
+        alignment=1 # Center
+    )
+
+    clean_ts_data = []
+    for i, row in enumerate(ts_data):
+        clean_row = []
+        
+        # Check condition for how to style column 0
+        val0 = str(row[0])
+        is_bold_section = False
+        is_header_row = False
+        
+        if "Total #" in val0 or "Hours" == val0 or "Reservations" == val0:
+            is_bold_section = True
+        elif val0.strip() and not str(row[1]).strip() and not str(row[2]).strip() and val0.strip() != "Reservation Data Audit" and val0.strip() != "If some #'s don't match with the total nb, it's due to events hosted by multiple dptmnts.":
+            is_bold_section = True
+            
+        if "AY" in str(row[5]) or i == 2:
+            is_header_row = True
+            
+        for col_idx, x in enumerate(row):
+            val = str(x).replace('.0', '') if str(x).endswith('.0') else str(x)
+            
+            # Wrap first column in Paragraph for automatic text wrapping & indentation
+            if col_idx == 0 and val.strip() and val.strip() != "Reservation Data Audit" and not val.strip().startswith("If some"):
+                if is_header_row:
+                    clean_row.append(Paragraph(val, ts_header_style))
+                elif is_bold_section:
+                    clean_row.append(Paragraph(val, ts_bold_style))
+                else:
+                    clean_row.append(Paragraph(val, ts_cell_style))
+            else:
+                clean_row.append(val)
+                
+        clean_ts_data.append(clean_row)
+        
+    ts_table = Table(clean_ts_data, colWidths=[200, 80, 80, 80, 80, 80], repeatRows=3)
+    
+    # Style the Top Sheet
+    ts_style = TableStyle([
+        ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
+        ('FONTSIZE', (0,0), (-1,-1), 10),
+        ('ALIGN', (1,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 6),
+        ('TOPPADDING', (0,0), (-1,-1), 6),
+        ('GRID', (0,2), (-1,-1), 0.5, colors.lightgrey),
+        ('BOX', (0,2), (-1,-1), 1.5, colors.HexColor('#2c3e50')),
+    ])
+    
+    # Highlight specific header structures
+    for i, row in enumerate(ts_data):
+        val0 = str(row[0]).strip()
+        if val0 and not str(row[1]).strip() and not str(row[2]).strip():
+            # Section separators / titles
+            if val0 != "Reservation Data Audit" and not val0.startswith("If some"):
+                ts_style.add('FONTNAME', (0, i), (-1, i), 'Helvetica-Bold')
+                ts_style.add('BACKGROUND', (0, i), (-1, i), colors.HexColor('#ecf0f1'))
+                ts_style.add('BOX', (0, i), (-1, i), 1, colors.HexColor('#bdc3c7'))
+        
+        if "AY" in str(row[5]) or i == 2:
+            # Column header row
+            ts_style.add('FONTNAME', (0, i), (-1, i), 'Helvetica-Bold')
+            ts_style.add('BACKGROUND', (0, i), (-1, i), colors.HexColor('#2980b9'))
+            ts_style.add('TEXTCOLOR', (0, i), (-1, i), colors.whitesmoke)
+            ts_style.add('ALIGN', (0, i), (-1, i), 'CENTER')
+            
+        if "Total #" in val0 or "Hours" == val0 or "Reservations" == val0:
+            ts_style.add('FONTNAME', (0,i), (-1,i), 'Helvetica-Bold')
+
+    ts_table.setStyle(ts_style)
+    elements.append(ts_table)
+    elements.append(Spacer(1, 30))
+    
+    # --- 2. Grouping Pairs ---
+    # Due to width, we'll selectively output heavily referenced columns
+    target_cols = ['Reservation Title', 'Booking Start Date', 'Clean Department', 'Clean School', 'Clean Room', 'Calc Hours']
+    
+    df_depts_schools = df_pack['depts_schools'].copy()
+    
+    def df_to_table(df_subset, table_title):
+        elements.append(PageBreak())
+        elements.append(Paragraph(table_title, h2_style))
+        elements.append(Spacer(1, 10))
+        
+        cols_to_use = [c for c in target_cols if c in df_subset.columns]
+        df_display = df_subset[cols_to_use].copy()
+        
+        for c in ['Booking Start Date', 'Booking End Date']:
+            if c in df_display.columns:
+                df_display[c] = pd.to_datetime(df_display[c], errors='coerce').dt.strftime('%Y-%m-%d')
+                
+        if 'Calc Hours' in df_display.columns:
+            df_display['Calc Hours'] = df_display['Calc Hours'].round(2).astype(str)
+            
+        df_display = df_display.fillna("")
+        df_display = df_display.astype(str)
+        
+        cell_style = styles['Normal']
+        cell_style.fontSize = 8
+        cell_style.leading = 10
+        
+        header_style = ParagraphStyle(
+            'Header',
+            parent=styles['Normal'],
+            fontName='Helvetica-Bold',
+            fontSize=8,
+            textColor=colors.whitesmoke,
+            alignment=0
+        )
+        
+        data = []
+        # Header row
+        header_row = [Paragraph(c, header_style) for c in df_display.columns]
+        data.append(header_row)
+        
+        # Data rows
+        for _, row in df_display.iterrows():
+            para_row = [Paragraph(str(val), cell_style) for val in row]
+            data.append(para_row)
+            
+        col_widths = []
+        for c in cols_to_use:
+            if c == 'Reservation Title': col_widths.append(192)
+            elif c == 'Booking Start Date': col_widths.append(70)
+            elif c == 'Clean Department': col_widths.append(150)
+            elif c == 'Clean School': col_widths.append(100)
+            elif c == 'Clean Room': col_widths.append(140)
+            elif c == 'Calc Hours': col_widths.append(60)
+            else: col_widths.append(100)
+            
+        t = Table(data, colWidths=col_widths, repeatRows=1)
+        
+        style = TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#34495e')),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+            ('TOPPADDING', (0, 0), (-1, 0), 8),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#bdc3c7')),
+        ])
+        
+        # Add alternating row colors for data
+        for i in range(1, len(data)):
+            if i % 2 == 0:
+                style.add('BACKGROUND', (0, i), (-1, i), colors.HexColor('#f9f9f9'))
+                
+        t.setStyle(style)
+        elements.append(t)
+    
+    semesters_list = df_pack['overall']['Semester'].unique()
+    for sem in semesters_list:
+        if sem == 'Other': continue
+        sem_code = get_semester_code(sem)
+        schools_df = df_depts_schools[df_depts_schools['Semester'] == sem].sort_values(by=['Clean School', 'Clean Department'])
+        df_to_table(schools_df, f"{sem_code} (Records)")
+        
+    # --- 3. One Sheet ---
+    if one_sheet_df is not None:
+        elements.append(PageBreak())
+        elements.append(Paragraph("One Sheet Update", h2_style))
+        elements.append(Spacer(1, 10))
+        
+        os_data = one_sheet_df.fillna("").astype(str).values.tolist()
+        
+        # Apply paragraph wrapping for One Sheet to avoid overflow
+        cell_style = styles['Normal']
+        cell_style.fontSize = 8
+        
+        wrapped_os_data = []
+        for line in os_data:
+            wrapped_os_data.append([Paragraph(str(val), cell_style) for val in line])
+            
+        os_table = Table(wrapped_os_data, colWidths=[90, 60, 160, 60, 60, 60, 60, 60, 90], repeatRows=1)
+        
+        os_style = TableStyle([
+            ('FONTNAME', (0,0), (-1,-1), 'Helvetica'),
+            ('FONTSIZE', (0,0), (-1,-1), 8),
+            ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+            ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
+        ])
+        
+        for i, row in enumerate(os_data):
+            if "Term" in str(row[1]) or "AY" in str(row[1]) and i == 0:
+                os_style.add('BACKGROUND', (0, i), (-1, i), colors.HexColor('#8e44ad'))
+            elif str(row[1]).strip() == "":
+                os_style.add('BACKGROUND', (0, i), (-1, i), colors.HexColor('#ecf0f1'))
+
+        os_table.setStyle(os_style)
+        elements.append(os_table)
+        
+    doc.build(elements)
+    buf.seek(0)
+    return buf
