@@ -13,7 +13,14 @@ st.set_page_config(page_title="Data Audit Tool", layout="wide")
 st.title("Reservation Data Audit Application")
 st.markdown("Upload the Booking Tool reservations CSV file to generate Grouping Pairs, Top Sheet, and One Sheet stats.")
 
-ay_start_year = st.number_input("Academic Year Starting Year (e.g., 2024 for AY24-25)", min_value=2015, max_value=2050, value=2024)
+if 'data_processed' not in st.session_state:
+    st.session_state.data_processed = False
+
+if not st.session_state.data_processed:
+    ay_start_year = st.number_input("Academic Year Starting Year (e.g., 2024 for AY24-25)", min_value=2015, max_value=2050, value=2024)
+else:
+    ay_start_year = st.session_state.ay_start_year
+    st.info(f"**Academic Year:** AY{str(ay_start_year)[-2:]}-{str(ay_start_year+1)[-2:]} *(Locked after processing)*")
 
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -22,9 +29,6 @@ with col2:
     excel_file = st.file_uploader("Upload Existing Excel Audit", type=['xlsx'])
 with col3:
     one_sheet_file = st.file_uploader("Upload Historic 'One Sheet' (Optional)", type=['csv'])
-
-if 'data_processed' not in st.session_state:
-    st.session_state.data_processed = False
 
 if uploaded_file is not None or excel_file is not None:
     st.success("File uploaded successfully!")
