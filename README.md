@@ -47,8 +47,8 @@ This application takes the raw reservations export (`All_BT_Reservations.csv`) a
 
 Once the data is processed, you can view the detailed grouping pairs in the **Grouping Pairs** tab. These tables are now fully interactive:
 - You can directly edit the values (e.g., `Clean School`, `Calc Hours`) within the Grouping Pairs tables via the Streamlit UI.
-- Any changes made will automatically re-calculate the **Top Sheet Overview** to reflect the updated metrics.
-- The underlying CSV files for both the Grouping Pairs and the Top Sheet are automatically re-exported to your local directory.
+- When you are ready, press the **Save Changes** button. Any changes made will re-calculate the **Top Sheet Overview** to reflect the updated metrics.
+- The underlying CSV files for both the Grouping Pairs and the Top Sheet are immediately re-exported to your local directory.
 
 ### Offline Excel Support
 If you prefer offline editing:

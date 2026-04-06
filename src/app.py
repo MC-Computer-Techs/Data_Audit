@@ -286,11 +286,12 @@ if st.session_state.data_processed:
                 if 'Summer' in sem_str: return f'Su{sem_str[-2:]}'
                 return 'Other'
 
-            any_changes = False
             semesters_list = df_overall['Semester'].unique()
             
             disabled_hours_cols = [c for c in ['Calc Hours', 'ACTUAL hours', 'Time In Use, Hours'] if c in df_overall.columns]
             
+            edited_dfs = []
+
             for sem in semesters_list:
                 if sem == 'Other': continue
                 sem_code = get_sem_code(sem)
@@ -299,9 +300,7 @@ if st.session_state.data_processed:
                 schools_df = df_depts_schools[df_depts_schools['Semester'] == sem].sort_values(by='Clean School')
                 with st.expander(f"📄 {sem_code} Schools"):
                     edited_schools = st.data_editor(schools_df, use_container_width=True, hide_index=True, key=f"{sem}_schools", disabled=disabled_hours_cols)
-                    if not edited_schools.equals(schools_df):
-                        if apply_edits_to_raw(edited_schools, schools_df):
-                            any_changes = True
+                    edited_dfs.append((edited_schools, schools_df))
                     
                     # Provide local download hook (just export to buffer for UI)
                     csv_buf = io.StringIO()
@@ -312,9 +311,7 @@ if st.session_state.data_processed:
                 depts_df = df_depts_schools[df_depts_schools['Semester'] == sem].sort_values(by='Clean Department')
                 with st.expander(f"📄 {sem_code} Dpmts"):
                     edited_depts = st.data_editor(depts_df, use_container_width=True, hide_index=True, key=f"{sem}_dpmts", disabled=disabled_hours_cols)
-                    if not edited_depts.equals(depts_df):
-                        if apply_edits_to_raw(edited_depts, depts_df):
-                            any_changes = True
+                    edited_dfs.append((edited_depts, depts_df))
                         
                     csv_buf = io.StringIO()
                     edited_depts.to_csv(csv_buf, index=False)
@@ -324,40 +321,45 @@ if st.session_state.data_processed:
                 rooms_df = df_rooms[df_rooms['Semester'] == sem].sort_values(by='Clean Room')
                 with st.expander(f"📄 {sem_code} Rooms"):
                     edited_rooms = st.data_editor(rooms_df, use_container_width=True, hide_index=True, key=f"{sem}_rooms", disabled=disabled_hours_cols)
-                    if not edited_rooms.equals(rooms_df):
-                        if apply_edits_to_raw(edited_rooms, rooms_df):
-                            any_changes = True
+                    edited_dfs.append((edited_rooms, rooms_df))
                         
                     csv_buf = io.StringIO()
                     edited_rooms.to_csv(csv_buf, index=False)
                     st.download_button(label=f"Download {sem_code}_Rooms.csv", data=csv_buf.getvalue(), file_name=f"{sem_code}_Rooms.csv", mime="text/csv", key=f"dl_{sem}_rooms")
 
-            if any_changes:
-                # 1. Reprocess all data from the modified master raw_df
-                new_processed, new_sems = process_reservations(st.session_state.raw_df, st.session_state.ay_start_year)
-                st.session_state.processed_df = new_processed
-                st.session_state.semesters = new_sems
-                
-                # 2. Regenerate Top Sheet
-                new_top_sheet = generate_top_sheet(new_processed, st.session_state.ay_start_year, new_sems)
-                st.session_state.top_sheet_df = new_top_sheet
-                
-                # 3. Re-export CSV files silently to keep the local disk cache synced
-                export_grouping_pairs(new_processed, st.session_state.grouping_dir)
-                ts_local_path = os.path.join(st.session_state.base_dir, f"Top_Sheet_{st.session_state.ay_start_year}-{st.session_state.ay_start_year+1}.csv")
-                new_top_sheet.to_csv(ts_local_path, index=False, header=False)
-                
-                # 4. Regenerate One Sheet if it was provided
-                if st.session_state.one_sheet_bytes is not None:
-                    temp_os_path = os.path.join(st.session_state.base_dir, "temp_one_sheet.csv")
-                    with open(temp_os_path, "wb") as f:
-                        f.write(st.session_state.one_sheet_bytes)
-                    new_os_updated = update_one_sheet(new_processed, temp_os_path, st.session_state.ay_start_year)
-                    st.session_state.one_sheet_updated_df = new_os_updated
-                    os_path = os.path.join(st.session_state.base_dir, f"One_Sheet_Updated_AY{str(st.session_state.ay_start_year)[-2:]}-{str(st.session_state.ay_start_year+1)[-2:]}.csv")
-                    new_os_updated.to_csv(os_path, index=False, header=False)
+            if st.button("Save Changes", type="primary"):
+                any_changes = False
+                for edited_df, original_df in edited_dfs:
+                    if not edited_df.equals(original_df):
+                        if apply_edits_to_raw(edited_df, original_df):
+                            any_changes = True
 
-                st.rerun()
+                if any_changes:
+                    # 1. Reprocess all data from the modified master raw_df
+                    new_processed, new_sems = process_reservations(st.session_state.raw_df, st.session_state.ay_start_year)
+                    st.session_state.processed_df = new_processed
+                    st.session_state.semesters = new_sems
+                    
+                    # 2. Regenerate Top Sheet
+                    new_top_sheet = generate_top_sheet(new_processed, st.session_state.ay_start_year, new_sems)
+                    st.session_state.top_sheet_df = new_top_sheet
+                    
+                    # 3. Re-export CSV files silently to keep the local disk cache synced
+                    export_grouping_pairs(new_processed, st.session_state.grouping_dir)
+                    ts_local_path = os.path.join(st.session_state.base_dir, f"Top_Sheet_{st.session_state.ay_start_year}-{st.session_state.ay_start_year+1}.csv")
+                    new_top_sheet.to_csv(ts_local_path, index=False, header=False)
+                    
+                    # 4. Regenerate One Sheet if it was provided
+                    if st.session_state.one_sheet_bytes is not None:
+                        temp_os_path = os.path.join(st.session_state.base_dir, "temp_one_sheet.csv")
+                        with open(temp_os_path, "wb") as f:
+                            f.write(st.session_state.one_sheet_bytes)
+                        new_os_updated = update_one_sheet(new_processed, temp_os_path, st.session_state.ay_start_year)
+                        st.session_state.one_sheet_updated_df = new_os_updated
+                        os_path = os.path.join(st.session_state.base_dir, f"One_Sheet_Updated_AY{str(st.session_state.ay_start_year)[-2:]}-{str(st.session_state.ay_start_year+1)[-2:]}.csv")
+                        new_os_updated.to_csv(os_path, index=False, header=False)
+
+                    st.rerun()
 
         with tab3:
             st.subheader("One Sheet Update")
