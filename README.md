@@ -8,25 +8,60 @@ This application takes the raw reservations export (`All_BT_Reservations.csv`) a
 
 ## How to Run
 
-1. Make sure you have `uv` installed.
+1. Make sure you have `uv` installed. Use `uv venv` to create a virtual environment, and use that when developing. If not in the virtual environment, use `source .venv/bin/activate` to get into it.
 2. Clone this repository and navigate to the directory:
    ```bash
    cd DataAudit
    ```
 3. Install dependencies:
    ```bash
-   ./setup.sh
+   uv pip install -r requirements.txt
    ```
+   *(Alternatively, run `./setup.sh` if it uses uv under the hood).*
+   
+   *Note: The application uses absolute imports (e.g., `from src.data_processor import ...`) which is resolved correctly when running `streamlit run src/app.py` from the project root.*
 4. To run the application, make sure your environment is activated:
    ```bash
    source .venv/bin/activate
-   ```   
+   ```
+   *Troubleshooting tip: If your python environment gets messed up, try recreating it:*
+   ```bash
+   rm -rf .venv
+   uv venv
+   source .venv/bin/activate
+   uv pip install -r requirements.txt
+   ```
+   *If `uv` commands hang or freeze indefinitely without output, macOS Gatekeeper may be blocking the executable in the background. To fix this, remove the quarantine flag and kill stuck instances:*
+   ```bash
+   xattr -d com.apple.quarantine ~/.local/bin/uv
+   killall -9 uv
+   ```
 5. Run the Streamlit app using `uv`:
    ```bash
    uv run streamlit run src/app.py
    ```
 6. The application will open in your browser automatically.
 7. Upload the raw data CSV and (optionally) the historic `One Sheet`.
+
+## Editable Grouping Pairs & Offline Excel Support
+
+Once the data is processed, you can view the detailed grouping pairs in the **Grouping Pairs** tab. These tables are now fully interactive:
+- You can directly edit the values (e.g., `Clean School`, `Calc Hours`) within the Grouping Pairs tables via the Streamlit UI.
+- When you are ready, press the **Save Changes** button. Any changes made will re-calculate the **Top Sheet Overview** to reflect the updated metrics.
+- The underlying CSV files for both the Grouping Pairs and the Top Sheet are immediately re-exported to your local directory.
+
+### Offline Excel Support
+If you prefer offline editing:
+1. Process your initial Booking Tool CSV file.
+2. Under the "Top Sheet Overview" tab, click **Download Full Audit (Excel)** to generate an `.xlsx` copy of your entire audit.
+3. Open this Excel file natively using Microsoft Excel or Apple Numbers. You'll find a clear Top Sheet, along with individual editable tabs per Grouping Pair.
+4. Modify any grouping pair (e.g., adjust rows in `F24_Schools`).
+5. Upload this modified `.xlsx` file into the new **Upload Existing Excel Audit** box at the top of the app and click "Process Data". The app will automatically sync your offline changes back into its core engine and update all internal totals!
+
+### Nicely Formatted PDF Export
+You can also generate a nicely formatted, highly polished PDF version of your Top Sheet, Grouping Pairs, and updated One Sheet.
+1. Process your initial Booking Tool CSV file.
+2. Under the "Top Sheet Overview" tab, click **Download Full Audit (PDF)** to generate the PDF report, which includes shaded tables, clear gridlines, and bold headers to present clean analytics.
 
 ## Data Filtering & Calculation Rules
 
