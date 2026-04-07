@@ -151,7 +151,7 @@ def calc_capped_hours(row):
 def process_reservations(df, ay_start_year):
     df_raw = df.copy()
     if '_raw_id' not in df_raw.columns:
-        df_raw['_raw_id'] = range(len(df_raw))
+        df_raw['_raw_id'] = range(1, len(df_raw) + 1)
         
         # FIX NATIVE CSV HOURS ON INITIAL IMPORT
         cols_to_fix = [c for c in ['ACTUAL hours', 'Time In Use, Hours'] if c in df_raw.columns]
@@ -272,6 +272,12 @@ def process_reservations(df, ay_start_year):
             dept_rows.append(new_row)
             
     df_depts_schools = pd.DataFrame(dept_rows).reset_index(drop=True)
+    
+    # Shift indices to start at 1 instead of 0
+    df.index = np.arange(1, len(df) + 1)
+    df_rooms.index = np.arange(1, len(df_rooms) + 1)
+    df_depts_schools.index = np.arange(1, len(df_depts_schools) + 1)
+    df_raw.index = np.arange(1, len(df_raw) + 1)
     
     # Store multiple dataframes back so export and Top Sheet can use them
     df_pack = {
