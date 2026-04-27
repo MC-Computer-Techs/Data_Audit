@@ -4,7 +4,7 @@ A Streamlit application to parse, audit, and aggregate Bookings Tool reservation
 
 ## Overview
 
-This application takes the raw reservations export (`All_BT_Reservations.csv`) and automatically groups the data by Space, Department, and School across an Academic Year (Fall, Winter, Spring, Summer). It creates a "Top Sheet" reporting overall metrics and updates historical tracking datasets ("One Sheet").
+This application takes the raw reservations export (`All_BT_Reservations.csv`) and automatically groups the data by Space, Department, and School across a user-defined date range. It dynamically identifies the required semesters (Fall, Winter, Spring, Summer) within that range, creates a "Top Sheet" reporting overall metrics, and updates historical tracking datasets ("One Sheet").
 
 ## How to Run
 
