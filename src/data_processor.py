@@ -131,8 +131,21 @@ def calc_capped_hours(row):
     try:
         start = row['Booking Start Date']
         end = row['Booking End Date']
+        
+        days_correction = 1
+        if 'Booking Start Time' in row and 'Booking End Time' in row:
+            st_str = str(row['Booking Start Time'])
+            et_str = str(row['Booking End Time'])
+            if st_str != 'nan' and et_str != 'nan':
+                dummy = "2000-01-01 "
+                s_dt = pd.to_datetime(dummy + st_str, errors='coerce')
+                e_dt = pd.to_datetime(dummy + et_str, errors='coerce')
+                if pd.notna(s_dt) and pd.notna(e_dt):
+                    if (e_dt - s_dt).total_seconds() < 0:
+                        days_correction = 0
+
         if pd.isna(start) or pd.isna(end): days = 1
-        else: days = max(1, (end - start).days + 1)
+        else: days = max(1, (end - start).days + days_correction)
         
         hours_col = 'ACTUAL hours' if 'ACTUAL hours' in row else 'Time In Use, Hours'
         raw_hours = pd.to_numeric(row[hours_col], errors='coerce')
@@ -142,7 +155,6 @@ def calc_capped_hours(row):
         if pd.isna(rooms) or rooms < 1: rooms = 1
             
         # Capping each day at 12 hours max
-        # min(raw_hours, days * 12 * rooms) assuming raw_hours is total aggregate
         cap = days * 12 * rooms
         return min(raw_hours, cap)
     except:
