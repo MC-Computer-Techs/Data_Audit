@@ -4,7 +4,7 @@ A Streamlit application to parse, audit, and aggregate Bookings Tool reservation
 
 ## Overview
 
-This application takes the raw reservations export (`All_BT_Reservations.csv`) and automatically groups the data by Space, Department, and School across an Academic Year (Fall, Winter, Spring, Summer). It creates a "Top Sheet" reporting overall metrics and updates historical tracking datasets ("One Sheet").
+This application takes the raw reservations export (`All_BT_Reservations.csv`) and automatically groups the data by Space, Department, and School across a user-defined date range. It dynamically identifies the required semesters (Fall, Winter, Spring, Summer) within that range, creates a "Top Sheet" reporting overall metrics, and updates historical tracking datasets ("One Sheet").
 
 ## How to Run
 
@@ -61,7 +61,7 @@ If you prefer offline editing:
 ### Nicely Formatted PDF Export
 You can also generate a nicely formatted, highly polished PDF version of your Top Sheet, Grouping Pairs, and updated One Sheet.
 1. Process your initial Booking Tool CSV file.
-2. Under the "Top Sheet Overview" tab, click **Download Full Audit (PDF)** to generate the PDF report, which includes shaded tables, clear gridlines, and bold headers to present clean analytics.
+2. Under the "Top Sheet Overview" tab, click **Download Top Sheet (PDF)** to generate the PDF report, which includes shaded tables, clear gridlines, and bold headers to present clean analytics.
 
 ## Data Filtering & Calculation Rules
 

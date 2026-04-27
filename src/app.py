@@ -16,11 +16,40 @@ st.markdown("Upload the Booking Tool reservations CSV file to generate Grouping 
 if 'data_processed' not in st.session_state:
     st.session_state.data_processed = False
 
-if not st.session_state.data_processed:
-    ay_start_year = st.number_input("Academic Year Starting Year (e.g., 2024 for AY24-25)", min_value=2015, max_value=2050, value=2024)
-else:
-    ay_start_year = st.session_state.ay_start_year
-    st.info(f"**Academic Year:** AY{str(ay_start_year)[-2:]}-{str(ay_start_year+1)[-2:]} *(Locked after processing)*")
+if 'ay_input_key' not in st.session_state:
+    st.session_state.ay_input_key = 2024
+if 'start_date_key' not in st.session_state:
+    st.session_state.start_date_key = datetime.date(2024, 9, 1)
+if 'end_date_key' not in st.session_state:
+    st.session_state.end_date_key = datetime.date(2025, 8, 31)
+
+def on_ay_change():
+    ay = st.session_state.ay_input_key
+    st.session_state.start_date_key = datetime.date(ay, 9, 1)
+    st.session_state.end_date_key = datetime.date(ay + 1, 8, 31)
+
+def on_date_change():
+    ay_inf = st.session_state.start_date_key.year if st.session_state.start_date_key.month >= 9 else st.session_state.start_date_key.year - 1
+    st.session_state.ay_input_key = ay_inf
+
+disabled = st.session_state.data_processed
+
+st.number_input(
+    "Academic Year Starting Year (e.g., 2024 for AY24-25)", 
+    min_value=2015, max_value=2050, 
+    key='ay_input_key',
+    on_change=on_ay_change,
+    disabled=disabled
+)
+
+c1, c2 = st.columns(2)
+with c1:
+    st.date_input("Start Date", key='start_date_key', on_change=on_date_change, disabled=disabled)
+with c2:
+    st.date_input("End Date", key='end_date_key', on_change=on_date_change, disabled=disabled)
+
+start_date = st.session_state.start_date_key
+end_date = st.session_state.end_date_key
 
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -38,13 +67,13 @@ if uploaded_file is not None or excel_file is not None:
             try:
                 # 1. Read input and Process
                 if excel_file is not None:
-                    processed_df, semesters = process_excel_import(excel_file, ay_start_year)
+                    processed_df, semesters = process_excel_import(excel_file, start_date, end_date)
                 else:
                     df = pd.read_csv(uploaded_file)
-                    processed_df, semesters = process_reservations(df, ay_start_year)
+                    processed_df, semesters = process_reservations(df, start_date, end_date)
                 
                 # 3. Create outputs directory
-                base_dir = f"{ay_start_year}-{ay_start_year+1}_Data_Audit"
+                base_dir = f"{start_date.strftime('%Y-%m-%d')}_to_{end_date.strftime('%Y-%m-%d')}_Data_Audit"
                 grouping_dir = os.path.join(base_dir, "Grouping_Pairs")
                 
                 if not os.path.exists(grouping_dir):
@@ -61,8 +90,8 @@ if uploaded_file is not None or excel_file is not None:
                 other_schools_df.to_csv(other_schools_path, index=False)
 
                 # 4. Generate Top Sheet
-                top_sheet_df = generate_top_sheet(processed_df, ay_start_year, semesters)
-                ts_path = os.path.join(base_dir, f"Top_Sheet_{ay_start_year}-{ay_start_year+1}.csv")
+                top_sheet_df = generate_top_sheet(processed_df, start_date, end_date, semesters)
+                ts_path = os.path.join(base_dir, f"Top_Sheet_{start_date.strftime('%Y-%m-%d')}_to_{end_date.strftime('%Y-%m-%d')}.csv")
                 top_sheet_df.to_csv(ts_path, index=False, header=False)
                 
                 # 4b. Update One Sheet (if provided)
@@ -75,8 +104,9 @@ if uploaded_file is not None or excel_file is not None:
                     with open(temp_os_path, "wb") as f:
                         f.write(one_sheet_bytes)
                         
-                    one_sheet_updated_df = update_one_sheet(processed_df, temp_os_path, ay_start_year)
-                    os_path = os.path.join(base_dir, f"One_Sheet_Updated_AY{str(ay_start_year)[-2:]}-{str(ay_start_year+1)[-2:]}.csv")
+                    one_sheet_updated_df = update_one_sheet(processed_df, temp_os_path, start_date)
+                    ay_start_year_inf = start_date.year if start_date.month >= 9 else start_date.year - 1
+                    os_path = os.path.join(base_dir, f"One_Sheet_Updated_AY{str(ay_start_year_inf)[-2:]}-{str(ay_start_year_inf+1)[-2:]}.csv")
                     one_sheet_updated_df.to_csv(os_path, index=False, header=False)
                 
                 # Store everything inside session state
@@ -90,12 +120,19 @@ if uploaded_file is not None or excel_file is not None:
                 st.session_state.one_sheet_updated_df = one_sheet_updated_df
                 st.session_state.one_sheet_bytes = one_sheet_bytes
                 
-                st.session_state.ay_start_year = ay_start_year
+                st.session_state.start_date = start_date
+                st.session_state.end_date = end_date
                 st.session_state.data_processed = True
+                st.session_state.processing_success_msg = f"Processing Complete! Files saved locally in `{base_dir}` directory."
                 
-                st.success(f"Processing Complete! Files saved locally in `{base_dir}` directory.")
+                st.rerun()
             except Exception as e:
                 st.error(f"An error occurred: {e}")
+
+if st.session_state.get('processing_success_msg'):
+    st.success(st.session_state.processing_success_msg)
+    # Clear the message so it doesn't persist forever on subsequent reruns
+    del st.session_state.processing_success_msg
 
 # Separate block for tabs, conditional on data being processed
 if st.session_state.data_processed:
@@ -111,41 +148,30 @@ if st.session_state.data_processed:
         one_sheet_updated_df = st.session_state.one_sheet_updated_df
         
         with tab1:
-            st.subheader(f"Top Sheet: AY {ay_start_year}-{ay_start_year+1}")
+            st.subheader(f"Top Sheet: {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}")
             
-            # Provide download button for the fully formatted Top Sheet CSV at the top
-            csv_buffer = io.StringIO()
-            top_sheet_df.to_csv(csv_buffer, index=False, header=False)
+            # Provide download buttons for Excel and PDF
+            c1, c2 = st.columns(2)
             
-            c1, c2, c3 = st.columns(3)
             with c1:
+                # PDF export logic
+                pdf_buf = export_to_pdf(processed_df, start_date, end_date, top_sheet_df, semesters, one_sheet_updated_df)
                 st.download_button(
-                    label="Download Full Top Sheet CSV",
-                    data=csv_buffer.getvalue(),
-                    file_name=f"Top_Sheet_{ay_start_year}-{ay_start_year+1}.csv",
-                    mime="text/csv",
+                    label="Download Top Sheet (PDF)",
+                    data=pdf_buf.getvalue(),
+                    file_name=f"Top_Sheet_{start_date.strftime('%Y-%m-%d')}_to_{end_date.strftime('%Y-%m-%d')}.pdf",
+                    mime="application/pdf",
                     type="primary"
                 )
             
             with c2:
                 # Excel export logic
-                excel_buf = export_to_excel(processed_df, ay_start_year, top_sheet_df, semesters)
+                excel_buf = export_to_excel(processed_df, start_date, end_date, top_sheet_df, semesters)
                 st.download_button(
                     label="Download Full Audit (Excel)",
                     data=excel_buf.getvalue(),
-                    file_name=f"Data_Audit_{ay_start_year}-{ay_start_year+1}.xlsx",
+                    file_name=f"Data_Audit_{start_date.strftime('%Y-%m-%d')}_to_{end_date.strftime('%Y-%m-%d')}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    type="primary"
-                )
-                
-            with c3:
-                # PDF export logic
-                pdf_buf = export_to_pdf(processed_df, ay_start_year, top_sheet_df, semesters, one_sheet_updated_df)
-                st.download_button(
-                    label="Download Full Audit (PDF)",
-                    data=pdf_buf.getvalue(),
-                    file_name=f"Data_Audit_{ay_start_year}-{ay_start_year+1}.pdf",
-                    mime="application/pdf",
                     type="primary"
                 )
             
@@ -340,17 +366,17 @@ if st.session_state.data_processed:
 
                 if any_changes:
                     # 1. Reprocess all data from the modified master raw_df
-                    new_processed, new_sems = process_reservations(st.session_state.raw_df, st.session_state.ay_start_year)
+                    new_processed, new_sems = process_reservations(st.session_state.raw_df, st.session_state.start_date, st.session_state.end_date)
                     st.session_state.processed_df = new_processed
                     st.session_state.semesters = new_sems
                     
                     # 2. Regenerate Top Sheet
-                    new_top_sheet = generate_top_sheet(new_processed, st.session_state.ay_start_year, new_sems)
+                    new_top_sheet = generate_top_sheet(new_processed, st.session_state.start_date, st.session_state.end_date, new_sems)
                     st.session_state.top_sheet_df = new_top_sheet
                     
                     # 3. Re-export CSV files silently to keep the local disk cache synced
                     export_grouping_pairs(new_processed, st.session_state.grouping_dir)
-                    ts_local_path = os.path.join(st.session_state.base_dir, f"Top_Sheet_{st.session_state.ay_start_year}-{st.session_state.ay_start_year+1}.csv")
+                    ts_local_path = os.path.join(st.session_state.base_dir, f"Top_Sheet_{st.session_state.start_date.strftime('%Y-%m-%d')}_to_{st.session_state.end_date.strftime('%Y-%m-%d')}.csv")
                     new_top_sheet.to_csv(ts_local_path, index=False, header=False)
                     
                     # 4. Regenerate One Sheet if it was provided
@@ -358,9 +384,10 @@ if st.session_state.data_processed:
                         temp_os_path = os.path.join(st.session_state.base_dir, "temp_one_sheet.csv")
                         with open(temp_os_path, "wb") as f:
                             f.write(st.session_state.one_sheet_bytes)
-                        new_os_updated = update_one_sheet(new_processed, temp_os_path, st.session_state.ay_start_year)
+                        new_os_updated = update_one_sheet(new_processed, temp_os_path, st.session_state.start_date)
                         st.session_state.one_sheet_updated_df = new_os_updated
-                        os_path = os.path.join(st.session_state.base_dir, f"One_Sheet_Updated_AY{str(st.session_state.ay_start_year)[-2:]}-{str(st.session_state.ay_start_year+1)[-2:]}.csv")
+                        ay_start_year_inf = st.session_state.start_date.year if st.session_state.start_date.month >= 9 else st.session_state.start_date.year - 1
+                        os_path = os.path.join(st.session_state.base_dir, f"One_Sheet_Updated_AY{str(ay_start_year_inf)[-2:]}-{str(ay_start_year_inf+1)[-2:]}.csv")
                         new_os_updated.to_csv(os_path, index=False, header=False)
 
                     st.rerun()
@@ -368,7 +395,8 @@ if st.session_state.data_processed:
         with tab3:
             st.subheader("One Sheet Update")
             if one_sheet_updated_df is not None:
-                st.write(f"The historic One Sheet has been updated with AY{str(ay_start_year+1)[-2:]} metrics.")
+                ay_start_year_inf = start_date.year if start_date.month >= 9 else start_date.year - 1
+                st.write(f"The historic One Sheet has been updated with AY{str(ay_start_year_inf+1)[-2:]} metrics based on the start date.")
                 st.dataframe(one_sheet_updated_df)
                 
                 csv_buffer_os = io.StringIO()
@@ -376,7 +404,7 @@ if st.session_state.data_processed:
                 st.download_button(
                     label="Download Updated One Sheet CSV",
                     data=csv_buffer_os.getvalue(),
-                    file_name=f"One_Sheet_Updated_AY{str(ay_start_year)[-2:]}-{str(ay_start_year+1)[-2:]}.csv",
+                    file_name=f"One_Sheet_Updated_AY{str(ay_start_year_inf)[-2:]}-{str(ay_start_year_inf+1)[-2:]}.csv",
                     mime="text/csv"
                 )
             else:

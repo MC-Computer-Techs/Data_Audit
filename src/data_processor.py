@@ -100,25 +100,24 @@ def map_school(dept_str, school_str, title_str=""):
     
     return 'Other Schools'
 
-def get_semester(date_obj, ay_start_year):
+def get_semester(date_obj):
     if pd.isna(date_obj): return 'Other'
-    year1 = ay_start_year
-    year2 = ay_start_year + 1
+    year = date_obj.year
+    month = date_obj.month
+    day = date_obj.day
     
-    fall_start = pd.Timestamp(year=year1, month=9, day=1)
-    fall_end = pd.Timestamp(year=year1, month=12, day=31)
-    winter_start = pd.Timestamp(year=year2, month=1, day=1)
-    winter_end = pd.Timestamp(year=year2, month=1, day=18)
-    spring_start = pd.Timestamp(year=year2, month=1, day=19)
-    spring_end = pd.Timestamp(year=year2, month=5, day=16)
-    summer_start = pd.Timestamp(year=year2, month=5, day=17)
-    summer_end = pd.Timestamp(year=year2, month=8, day=31)
-    
-    if fall_start <= date_obj <= fall_end: return f'Fall {year1}'
-    if winter_start <= date_obj <= winter_end: return f'Winter {year2}'
-    if spring_start <= date_obj <= spring_end: return f'Spring {year2}'
-    if summer_start <= date_obj <= summer_end: return f'Summer {year2}'
-    return 'Other'
+    if month >= 9:
+        return f'Fall {year}'
+    elif month == 1 and day <= 18:
+        return f'Winter {year}'
+    elif month == 1 and day > 18:
+        return f'Spring {year}'
+    elif 2 <= month <= 4:
+        return f'Spring {year}'
+    elif month == 5 and day <= 16:
+        return f'Spring {year}'
+    else:
+        return f'Summer {year}'
 
 def get_semester_code(sem_str):
     if 'Fall' in sem_str: return f'F{sem_str[-2:]}'
@@ -160,7 +159,7 @@ def calc_capped_hours(row):
     except:
         return 0
 
-def process_reservations(df, ay_start_year):
+def process_reservations(df, start_date, end_date):
     df_raw = df.copy()
     if '_raw_id' not in df_raw.columns:
         df_raw['_raw_id'] = range(1, len(df_raw) + 1)
@@ -242,16 +241,22 @@ def process_reservations(df, ay_start_year):
 
     df_raw['Booking Start Date'] = pd.to_datetime(df_raw['Booking Start Date'], errors='coerce')
     df_raw['Booking End Date'] = pd.to_datetime(df_raw['Booking End Date'], errors='coerce')
-    df_raw['Semester'] = df_raw['Booking Start Date'].apply(lambda x: get_semester(x, ay_start_year))
+    df_raw['Semester'] = df_raw['Booking Start Date'].apply(get_semester)
     
-    # Filter only for the current Academic Year
-    semesters = [f'Fall {ay_start_year}', f'Winter {ay_start_year+1}', f'Spring {ay_start_year+1}', f'Summer {ay_start_year+1}']
-    valid_semester = df_raw['Semester'].isin(semesters)
-    df_raw.loc[~valid_semester, 'Filtered Out'] = True
-    df_raw.loc[~valid_semester, 'Filter Reason'] += 'Outside AY Set Ranges; '
+    valid_date = (df_raw['Booking Start Date'].dt.date >= start_date) & (df_raw['Booking Start Date'].dt.date <= end_date)
+    df_raw.loc[~valid_date, 'Filtered Out'] = True
+    df_raw.loc[~valid_date, 'Filter Reason'] += 'Outside Selected Date Range; '
     
     # Create the valid subset to continue normal processing
     df = df_raw[~df_raw['Filtered Out']].copy()
+    
+    def get_semester_sort_key(sem_str):
+        if sem_str == 'Other': return (9999, 9)
+        term, year_str = sem_str.split(' ')
+        term_order = {'Fall': 0, 'Winter': 1, 'Spring': 2, 'Summer': 3}
+        return (int(year_str), term_order.get(term, 4))
+        
+    semesters = sorted([s for s in df['Semester'].unique() if s != 'Other'], key=get_semester_sort_key)
     
     df['Calc Hours'] = df.apply(calc_capped_hours, axis=1)
     
@@ -335,23 +340,24 @@ def export_grouping_pairs(df_pack, output_dir):
         
     return generated_files
 
-def generate_top_sheet(df_pack, ay_start_year, semesters):
+def generate_top_sheet(df_pack, start_date, end_date, semesters):
     """Generate the structured Top Sheet."""
     df_overall = df_pack['overall']
     df_rooms = df_pack['rooms']
     df_depts_schools = df_pack['depts_schools']
     
-    ay_code = str(ay_start_year + 1)[-2:]
     total_res = len(df_overall)
+    date_str = f"{start_date.strftime('%b %Y')} - {end_date.strftime('%b %Y')}"
     
-    # Init structure
+    # Init structure dynamically based on number of semesters
+    padding = [""] * (len(semesters) + 1)
     output_rows = [
-        ["Reservation Data Audit", "", "", "", "", ""],
-        ["If some #'s don't match with the total nb, it's due to events hosted by multiple dptmnts.", "", "", "", "", ""],
-        ["", semesters[0], semesters[1], semesters[2], semesters[3], f"AY{ay_code}, total:"],
-        ["", "", "", "", "", ""],
-        ["Total # of reservations:", "", "", "", "", total_res],
-        ["", "", "", "", "", ""]
+        [f"Reservation Data Audit ({date_str})"] + padding,
+        ["If some #'s don't match with the total nb, it's due to events hosted by multiple dptmnts."] + padding,
+        [""] + semesters + ["Total:"],
+        [""] + padding,
+        ["Total # of reservations:"] + [""] * len(semesters) + [total_res],
+        [""] + padding
     ]
     
     overall_hours = [round(df_overall[df_overall['Semester'] == s]['Calc Hours'].sum(), 2) for s in semesters]
@@ -390,7 +396,7 @@ def generate_top_sheet(df_pack, ay_start_year, semesters):
     top_sheet_df = pd.DataFrame(output_rows)
     return top_sheet_df
 
-def update_one_sheet(df_pack, one_sheet_path, ay_start_year):
+def update_one_sheet(df_pack, one_sheet_path, start_date):
     """
     Reads the existing One Sheet CSV, appends a new row for AY(ay_start_year+1) under
     each of the sections (Overall, By Department, By School, By Space).
@@ -400,6 +406,7 @@ def update_one_sheet(df_pack, one_sheet_path, ay_start_year):
     df_rooms = df_pack['rooms']
     df_depts_schools = df_pack['depts_schools']
     
+    ay_start_year = start_date.year if start_date.month >= 9 else start_date.year - 1
     ay_code = f"AY{str(ay_start_year + 1)[-2:]}"
     prev_ay_code = f"AY{str(ay_start_year)[-2:]}"
     
@@ -475,7 +482,7 @@ def update_one_sheet(df_pack, one_sheet_path, ay_start_year):
     updated_df = pd.DataFrame(output_lines)
     return updated_df
 
-def export_to_excel(df_pack, ay_start_year, top_sheet_df, semesters):
+def export_to_excel(df_pack, start_date, end_date, top_sheet_df, semesters):
     """
     Export the full data audit to an Excel file represented as a BytesIO buffer.
     """
@@ -513,7 +520,7 @@ def export_to_excel(df_pack, ay_start_year, top_sheet_df, semesters):
     buf.seek(0)
     return buf
 
-def process_excel_import(uploaded_file, ay_start_year):
+def process_excel_import(uploaded_file, start_date, end_date):
     """
     Process an uploaded Excel file, applying any edits made in the grouping sheets
     back to the raw data, and process it entirely.
@@ -533,7 +540,7 @@ def process_excel_import(uploaded_file, ay_start_year):
         if '_raw_id' not in edited_df.columns:
             continue
             
-        temp_pack, _ = process_reservations(raw_df, ay_start_year)
+        temp_pack, _ = process_reservations(raw_df, start_date, end_date)
         
         if '_Schools' in sheet: original_df = temp_pack['depts_schools']
         elif '_Dpmts' in sheet: original_df = temp_pack['depts_schools']
@@ -611,10 +618,10 @@ def process_excel_import(uploaded_file, ay_start_year):
                     except Exception:
                         pass
                         
-    final_pack, final_sems = process_reservations(raw_df, ay_start_year)
+    final_pack, final_sems = process_reservations(raw_df, start_date, end_date)
     return final_pack, final_sems
 
-def export_to_pdf(df_pack, ay_start_year, top_sheet_df, semesters, one_sheet_df=None):
+def export_to_pdf(df_pack, start_date, end_date, top_sheet_df, semesters, one_sheet_df=None):
     """
     Export the full data audit to a beautifully formatted PDF buffer using ReportLab.
     """
@@ -631,7 +638,8 @@ def export_to_pdf(df_pack, ay_start_year, top_sheet_df, semesters, one_sheet_df=
     h3_style = styles['Heading3']
     
     # --- 1. Top Sheet ---
-    elements.append(Paragraph(f"Data Audit Report: AY{str(ay_start_year)[-2:]}-{str(ay_start_year+1)[-2:]}", title_style))
+    date_str = f"{start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}"
+    elements.append(Paragraph(f"Data Audit Report: {date_str}", title_style))
     elements.append(Spacer(1, 20))
     
     ts_data = top_sheet_df.fillna("").astype(str).values.tolist()
@@ -681,11 +689,18 @@ def export_to_pdf(df_pack, ay_start_year, top_sheet_df, semesters, one_sheet_df=
         elif val0.strip() and not str(row[1]).strip() and not str(row[2]).strip() and val0.strip() != "Reservation Data Audit" and val0.strip() != "If some #'s don't match with the total nb, it's due to events hosted by multiple dptmnts.":
             is_bold_section = True
             
-        if "AY" in str(row[5]) or i == 2:
+        if "Total:" in str(row[-1]) or i == 2:
             is_header_row = True
             
         for col_idx, x in enumerate(row):
             val = str(x).replace('.0', '') if str(x).endswith('.0') else str(x)
+            
+            # Round hours to nearest integer for the PDF export
+            if col_idx > 0:
+                try:
+                    val = str(int(round(float(val))))
+                except ValueError:
+                    pass
             
             # Wrap first column in Paragraph for automatic text wrapping & indentation
             if col_idx == 0 and val.strip() and val.strip() != "Reservation Data Audit" and not val.strip().startswith("If some"):
@@ -700,7 +715,10 @@ def export_to_pdf(df_pack, ay_start_year, top_sheet_df, semesters, one_sheet_df=
                 
         clean_ts_data.append(clean_row)
         
-    ts_table = Table(clean_ts_data, colWidths=[200, 80, 80, 80, 80, 80], repeatRows=3)
+    available_width = 712 - 200
+    w = max(40, available_width / (len(semesters) + 1)) if len(semesters) + 1 > 0 else 80
+    col_widths = [200] + [w] * (len(semesters) + 1)
+    ts_table = Table(clean_ts_data, colWidths=col_widths, repeatRows=3)
     
     # Style the Top Sheet
     ts_style = TableStyle([
@@ -724,7 +742,7 @@ def export_to_pdf(df_pack, ay_start_year, top_sheet_df, semesters, one_sheet_df=
                 ts_style.add('BACKGROUND', (0, i), (-1, i), colors.HexColor('#ecf0f1'))
                 ts_style.add('BOX', (0, i), (-1, i), 1, colors.HexColor('#bdc3c7'))
         
-        if "AY" in str(row[5]) or i == 2:
+        if "Total:" in str(row[-1]) or i == 2:
             # Column header row
             ts_style.add('FONTNAME', (0, i), (-1, i), 'Helvetica-Bold')
             ts_style.add('BACKGROUND', (0, i), (-1, i), colors.HexColor('#2980b9'))
@@ -757,7 +775,7 @@ def export_to_pdf(df_pack, ay_start_year, top_sheet_df, semesters, one_sheet_df=
                 df_display[c] = pd.to_datetime(df_display[c], errors='coerce').dt.strftime('%Y-%m-%d')
                 
         if 'Calc Hours' in df_display.columns:
-            df_display['Calc Hours'] = df_display['Calc Hours'].round(2).astype(str)
+            df_display['Calc Hours'] = df_display['Calc Hours'].round(0).apply(lambda x: str(int(x)) if pd.notna(x) else "")
             
         df_display = df_display.fillna("")
         df_display = df_display.astype(str)
@@ -835,6 +853,11 @@ def export_to_pdf(df_pack, ay_start_year, top_sheet_df, semesters, one_sheet_df=
         
         wrapped_os_data = []
         for line in os_data:
+            try:
+                if len(line) > 4 and line[4]:
+                    line[4] = str(int(round(float(line[4].replace(',', '')))))
+            except ValueError:
+                pass
             wrapped_os_data.append([Paragraph(str(val), cell_style) for val in line])
             
         os_table = Table(wrapped_os_data, colWidths=[90, 60, 160, 60, 60, 60, 60, 60, 90], repeatRows=1)
