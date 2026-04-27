@@ -687,6 +687,13 @@ def export_to_pdf(df_pack, ay_start_year, top_sheet_df, semesters, one_sheet_df=
         for col_idx, x in enumerate(row):
             val = str(x).replace('.0', '') if str(x).endswith('.0') else str(x)
             
+            # Round hours to nearest integer for the PDF export
+            if col_idx > 0:
+                try:
+                    val = str(int(round(float(val))))
+                except ValueError:
+                    pass
+            
             # Wrap first column in Paragraph for automatic text wrapping & indentation
             if col_idx == 0 and val.strip() and val.strip() != "Reservation Data Audit" and not val.strip().startswith("If some"):
                 if is_header_row:
@@ -757,7 +764,7 @@ def export_to_pdf(df_pack, ay_start_year, top_sheet_df, semesters, one_sheet_df=
                 df_display[c] = pd.to_datetime(df_display[c], errors='coerce').dt.strftime('%Y-%m-%d')
                 
         if 'Calc Hours' in df_display.columns:
-            df_display['Calc Hours'] = df_display['Calc Hours'].round(2).astype(str)
+            df_display['Calc Hours'] = df_display['Calc Hours'].round(0).apply(lambda x: str(int(x)) if pd.notna(x) else "")
             
         df_display = df_display.fillna("")
         df_display = df_display.astype(str)
@@ -835,6 +842,11 @@ def export_to_pdf(df_pack, ay_start_year, top_sheet_df, semesters, one_sheet_df=
         
         wrapped_os_data = []
         for line in os_data:
+            try:
+                if len(line) > 4 and line[4]:
+                    line[4] = str(int(round(float(line[4].replace(',', '')))))
+            except ValueError:
+                pass
             wrapped_os_data.append([Paragraph(str(val), cell_style) for val in line])
             
         os_table = Table(wrapped_os_data, colWidths=[90, 60, 160, 60, 60, 60, 60, 60, 90], repeatRows=1)
