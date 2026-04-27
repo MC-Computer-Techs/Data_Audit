@@ -113,17 +113,17 @@ if st.session_state.data_processed:
         with tab1:
             st.subheader(f"Top Sheet: AY {ay_start_year}-{ay_start_year+1}")
             
-            # Provide download button for the fully formatted Top Sheet CSV at the top
-            csv_buffer = io.StringIO()
-            top_sheet_df.to_csv(csv_buffer, index=False, header=False)
+            # Provide download buttons for Excel and PDF
+            c1, c2 = st.columns(2)
             
-            c1, c2, c3 = st.columns(3)
             with c1:
+                # PDF export logic
+                pdf_buf = export_to_pdf(processed_df, ay_start_year, top_sheet_df, semesters, one_sheet_updated_df)
                 st.download_button(
-                    label="Download Full Top Sheet CSV",
-                    data=csv_buffer.getvalue(),
-                    file_name=f"Top_Sheet_{ay_start_year}-{ay_start_year+1}.csv",
-                    mime="text/csv",
+                    label="Download Top Sheet (PDF)",
+                    data=pdf_buf.getvalue(),
+                    file_name=f"Top_Sheet_{ay_start_year}-{ay_start_year+1}.pdf",
+                    mime="application/pdf",
                     type="primary"
                 )
             
@@ -135,17 +135,6 @@ if st.session_state.data_processed:
                     data=excel_buf.getvalue(),
                     file_name=f"Data_Audit_{ay_start_year}-{ay_start_year+1}.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    type="primary"
-                )
-                
-            with c3:
-                # PDF export logic
-                pdf_buf = export_to_pdf(processed_df, ay_start_year, top_sheet_df, semesters, one_sheet_updated_df)
-                st.download_button(
-                    label="Download Full Audit (PDF)",
-                    data=pdf_buf.getvalue(),
-                    file_name=f"Data_Audit_{ay_start_year}-{ay_start_year+1}.pdf",
-                    mime="application/pdf",
                     type="primary"
                 )
             

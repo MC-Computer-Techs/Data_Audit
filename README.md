@@ -61,7 +61,7 @@ If you prefer offline editing:
 ### Nicely Formatted PDF Export
 You can also generate a nicely formatted, highly polished PDF version of your Top Sheet, Grouping Pairs, and updated One Sheet.
 1. Process your initial Booking Tool CSV file.
-2. Under the "Top Sheet Overview" tab, click **Download Full Audit (PDF)** to generate the PDF report, which includes shaded tables, clear gridlines, and bold headers to present clean analytics.
+2. Under the "Top Sheet Overview" tab, click **Download Top Sheet (PDF)** to generate the PDF report, which includes shaded tables, clear gridlines, and bold headers to present clean analytics.
 
 ## Data Filtering & Calculation Rules
 
