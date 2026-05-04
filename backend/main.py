@@ -211,6 +211,15 @@ async def update_groupings(session_id: str, payload: dict):
 
         if mapped_col in raw_df.columns:
             mask = raw_df['_raw_id'] == raw_id
+            
+            # Coerce to string if target column expects string
+            if new_val is not None and not isinstance(new_val, str):
+                if pd.api.types.is_string_dtype(raw_df[mapped_col]):
+                    if isinstance(new_val, float) and new_val.is_integer():
+                        new_val = str(int(new_val))
+                    else:
+                        new_val = str(new_val)
+                        
             raw_df.loc[mask, mapped_col] = new_val
             changes_made = True
             

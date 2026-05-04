@@ -546,6 +546,11 @@ def process_excel_import(uploaded_file, start_date, end_date):
     """
     Process an uploaded Excel file, applying any edits made in the grouping sheets
     back to the raw data, and process it entirely.
+    
+    Only user-editable columns are compared. Derived/computed columns (Filter Reason,
+    All Depts, Semester, Calc Hours on Room sheets, etc.) are ignored to prevent
+    false-positive change detection from type mismatches and floating-point precision
+    noise during the Excel round-trip.
     """
     xls = pd.ExcelFile(uploaded_file)
     sheet_names = xls.sheet_names
@@ -555,47 +560,130 @@ def process_excel_import(uploaded_file, start_date, end_date):
     raw_df['Booking Start Date'] = pd.to_datetime(raw_df['Booking Start Date'], errors='coerce')
     raw_df['Booking End Date'] = pd.to_datetime(raw_df['Booking End Date'], errors='coerce')
     
+    # Columns that are computed/derived and should NEVER be synced back from
+    # grouping sheets to raw data. These cause massive false-positive diffs due to
+    # type round-trip issues (list->str, nan->empty string, float precision).
+    SKIP_COLS = {
+        '_raw_id', 'Filtered Out', 'Filter Reason', 'Semester', 'All Depts',
+        'Clean School',  # Derived from Department
+    }
+    
+    # Columns that map from grouping-sheet names to raw data column names
+    COL_MAP = {
+        'Clean Department': 'Department',
+        'Clean Room': 'Room(s)',
+    }
+    
     for sheet in sheet_names:
         if sheet in ['Top Sheet', 'Raw Data']: continue
         
         edited_df = pd.read_excel(uploaded_file, sheet_name=sheet)
         if '_raw_id' not in edited_df.columns:
             continue
+        
+        is_rooms_sheet = '_Rooms' in sheet
             
         temp_pack, _ = process_reservations(raw_df, start_date, end_date)
         
         if '_Schools' in sheet: original_df = temp_pack['depts_schools']
         elif '_Dpmts' in sheet: original_df = temp_pack['depts_schools']
-        elif '_Rooms' in sheet: original_df = temp_pack['rooms']
+        elif is_rooms_sheet: original_df = temp_pack['rooms']
         else: continue
             
         edited_df = edited_df.sort_values('_raw_id').reset_index(drop=True)
         orig_subset = original_df[original_df['_raw_id'].isin(edited_df['_raw_id'])].sort_values('_raw_id').reset_index(drop=True)
         
-        # To avoid issues with float nan vs empty string, filling na before diff might be safer or using the same na comparison
-        if len(edited_df) == len(orig_subset):
-            changed_mask = edited_df != orig_subset
-            changed_mask = changed_mask & ~(edited_df.isna() & orig_subset.isna())
-            
-            for idx in changed_mask.index[changed_mask.any(axis=1)]:
-                raw_id = orig_subset.loc[idx, '_raw_id']
-                time_edited = False
-                for col in changed_mask.columns[changed_mask.loc[idx]]:
-                    new_val = edited_df.loc[idx, col]
-                    mapped_col = col
-                    if col == 'Clean Department': mapped_col = 'Department'
-                    elif col == 'Clean Room': mapped_col = 'Room(s)'
-                    elif col == 'Clean School': continue
-                    elif col == 'Calc Hours':
-                        mapped_col = 'ACTUAL hours' if 'ACTUAL hours' in raw_df.columns else 'Time In Use, Hours'
+        if len(edited_df) != len(orig_subset):
+            continue
+        
+        # Only compare columns that a user could meaningfully edit
+        comparable_cols = []
+        for col in edited_df.columns:
+            if col in SKIP_COLS:
+                continue
+            # Never sync Calc Hours from Rooms sheets — those contain per-room
+            # split values (total_hours / num_rooms) that would corrupt ACTUAL hours
+            if col == 'Calc Hours' and is_rooms_sheet:
+                continue
+            comparable_cols.append(col)
+        
+        for col in comparable_cols:
+            if col not in orig_subset.columns:
+                continue
+                
+            for idx in range(len(edited_df)):
+                edit_val = edited_df.loc[idx, col]
+                orig_val = orig_subset.loc[idx, col]
+                
+                # Both NaN/None → no change
+                edit_is_na = pd.isna(edit_val) if not isinstance(edit_val, str) else False
+                orig_is_na = pd.isna(orig_val) if not isinstance(orig_val, str) else False
+                if edit_is_na and orig_is_na:
+                    continue
                     
-                    if mapped_col in ['Booking Start Date', 'Booking End Date', 'Booking Start Time', 'Booking End Time']:
-                        time_edited = True
-                        
-                    if mapped_col in raw_df.columns:
-                        mask = raw_df['_raw_id'] == raw_id
-                        raw_df.loc[mask, mapped_col] = new_val
-                        
+                # NaN vs empty string → no change (Excel round-trip artifact)
+                if edit_is_na and isinstance(orig_val, str) and orig_val == '':
+                    continue
+                if orig_is_na and isinstance(edit_val, str) and edit_val == '':
+                    continue
+                
+                # Normalize for comparison: coerce both to string for string columns
+                if pd.api.types.is_string_dtype(orig_subset[col]):
+                    edit_cmp = str(edit_val) if not edit_is_na else ''
+                    orig_cmp = str(orig_val) if not orig_is_na else ''
+                    # Numeric string normalization: '1.0' == '1'
+                    try:
+                        if float(edit_cmp) == float(orig_cmp):
+                            continue
+                    except (ValueError, TypeError):
+                        pass
+                    if edit_cmp == orig_cmp:
+                        continue
+                elif pd.api.types.is_numeric_dtype(orig_subset[col]):
+                    # Float precision tolerance
+                    try:
+                        if abs(float(edit_val) - float(orig_val)) < 1e-6:
+                            continue
+                    except (ValueError, TypeError):
+                        pass
+                    if edit_val == orig_val:
+                        continue
+                else:
+                    # Datetime or other types
+                    if edit_val == orig_val:
+                        continue
+                
+                # --- This is a genuine user edit ---
+                raw_id = orig_subset.loc[idx, '_raw_id']
+                new_val = edit_val
+                
+                # Convert float64 to string if target column expects string
+                if not pd.isna(new_val) and not isinstance(new_val, str):
+                    if pd.api.types.is_string_dtype(orig_subset[col]):
+                        if isinstance(new_val, float) and new_val.is_integer():
+                            new_val = str(int(new_val))
+                        else:
+                            new_val = str(new_val)
+                
+                mapped_col = COL_MAP.get(col, col)
+                if mapped_col == col and col == 'Calc Hours':
+                    mapped_col = 'ACTUAL hours' if 'ACTUAL hours' in raw_df.columns else 'Time In Use, Hours'
+                
+                time_edited = mapped_col in ['Booking Start Date', 'Booking End Date', 'Booking Start Time', 'Booking End Time']
+                    
+                if mapped_col in raw_df.columns:
+                    mask = raw_df['_raw_id'] == raw_id
+                    
+                    # Coerce to string if target column expects string
+                    if not pd.isna(new_val) and not isinstance(new_val, str):
+                        if pd.api.types.is_string_dtype(raw_df[mapped_col]):
+                            if isinstance(new_val, float) and new_val.is_integer():
+                                new_val = str(int(new_val))
+                            else:
+                                new_val = str(new_val)
+                    
+                    raw_df.loc[mask, mapped_col] = new_val
+                    
                 if time_edited:
                     mask = raw_df['_raw_id'] == raw_id
                     row_data = raw_df.loc[mask].iloc[0]

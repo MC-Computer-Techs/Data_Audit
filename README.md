@@ -65,3 +65,9 @@ Based on the required reporting rules, the application alters the raw data mathe
 * **Missing Departments**: Over 900+ raw entries lack a formal Department assignment. The scripts infer the target Department structurally by searching the `Reservation Title` for common program acronyms (ITP, IDM, Game Center, Music Tech, etc.). If none are found, it falls back to `Other Group(s)`.
 * **Missing Schools**: If a department is inferred as `Other Group(s)`, the application takes an extra step to scan the `Reservation Title` for school keywords (e.g., Tisch, Steinhardt, Tandon, CUSP, ECE, CSAW) and assigns them to the correct School metric instead of defaulting to `Other Schools`.
 * **Overnight Day Rules**: If a booking is strictly overnight (e.g., its start time is later in the day than its end time), the span of calendar dates is appropriately subtracted by 1 to represent the true number of active nights/days used for the booking. The total hours are then directly multiplied by these actual days.
+
+## Recent Updates
+
+- Fixed missing dependency (`reportlab`) causing PDF export failures. Use `uv pip install -r requirements.txt` within the `.venv` to install all necessary packages.
+- Added type coercion to ensure Excel imports containing numbers or empty values do not cause `float64` type errors when parsed against string-based grouping algorithms.
+- Fixed Excel round-trip hours drift (~48 hours lost on re-import). Root cause was false-positive change detection from type mismatches (`nan` vs empty string, `list` vs stringified list, float precision noise) that caused split per-room hours to overwrite full `ACTUAL hours` in the raw data. The import now skips derived columns and uses tolerance-based comparison for numerics.
