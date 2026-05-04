@@ -222,11 +222,23 @@ def process_reservations(df, start_date, end_date):
     df_raw['Filtered Out'] = False
     df_raw['Filter Reason'] = ''
     
-    # 1. Filter Statuses per Reference.md
+    # 1. Filter Statuses if Approved or Checked Out is not in the list in End Event Status cell, seperate by commas
     if 'End Event Status' in df_raw.columns:
-        valid_status = df_raw['End Event Status'].isin(['Approved', 'Checked out'])
+        status_col = df_raw['End Event Status'].astype(str).str.lower()
+        valid_status = status_col.apply(lambda x: 'approved' in x or 'checked out' in x)
+        failed_rows = df_raw[~valid_status]
+        for idx in failed_rows.index:
+            status_val = str(df_raw.loc[idx, 'End Event Status']).strip()
+            
+            # If it's "Canceled, Cancelled, ...", append 'Canceled' once
+            if ',' in status_val:
+                statuses = [s.strip().lower() for s in status_val.split(',') if s.strip()]
+                unique_statuses = list(dict.fromkeys(statuses))  # preserve order
+                df_raw.loc[idx, 'Filter Reason'] = f"Statuses: {', '.join(unique_statuses)}; "
+            else:
+                df_raw.loc[idx, 'Filter Reason'] = f"Status: {status_val}; "
+        
         df_raw.loc[~valid_status, 'Filtered Out'] = True
-        df_raw.loc[~valid_status, 'Filter Reason'] += 'Status not Approved/Checked out; '
     else:
         valid_status = pd.Series(True, index=df_raw.index)
         
@@ -238,6 +250,16 @@ def process_reservations(df, start_date, end_date):
         df_raw.loc[maint_mask, 'Filter Reason'] += 'Maintenance; '
     else:
         maint_mask = pd.Series(False, index=df_raw.index)
+
+    # 3. Exclude Rooms with "000"
+    if 'Room(s)' in df_raw.columns:
+        rooms_zero_mask = df_raw['Room(s)'].astype(str).str.contains('000')
+        df_raw.loc[rooms_zero_mask, 'Filtered Out'] = True
+        df_raw.loc[rooms_zero_mask, 'Filter Reason'] += 'Room 000; '
+    else: 
+        rooms_zero_mask = pd.Series(False, index=df_raw.index)
+
+    
 
     df_raw['Booking Start Date'] = pd.to_datetime(df_raw['Booking Start Date'], errors='coerce')
     df_raw['Booking End Date'] = pd.to_datetime(df_raw['Booking End Date'], errors='coerce')
