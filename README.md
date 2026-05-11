@@ -6,34 +6,76 @@ A full-stack application using FastAPI and React to parse, audit, and aggregate 
 
 This application takes the raw reservations export (`All_BT_Reservations.csv`) and automatically groups the data by Space, Department, and School across a user-defined date range. It dynamically identifies the required semesters (Fall, Winter, Spring, Summer) within that range, creates a "Top Sheet" reporting overall metrics, and updates historical tracking datasets ("One Sheet").
 
-## How to Run
+## Installation & Setup from Scratch
 
-1. Make sure you have `uv` and `npm` installed. Use `uv venv` to create a virtual environment for the backend.
-2. Clone this repository and navigate to the directory:
-   ```bash
-   cd DataAudit
-   ```
-3. Set up and start the **FastAPI Backend**:
-   *(Make sure you are in the root `DataAudit` directory, not the `frontend` folder)*
-   ```bash
-   uv venv
-   source .venv/bin/activate
-   uv pip install -r requirements.txt
-   uvicorn backend.main:app --reload
-   ```
-   *The backend will run on `http://127.0.0.1:8000`.*
-   
-4. Set up and start the **React Frontend**:
-   Open a new terminal window:
-   ```bash
-   cd frontend
-   npm install
-   npm run dev
-   ```
-   *The frontend will run on `http://localhost:5173`.*
+If you are setting this up on a fresh computer, follow these steps to install the necessary system dependencies before running the app.
 
-5. The application will be accessible via the frontend URL in your browser.
-6. Upload the raw data CSV and (optionally) the historic `One Sheet`.
+### 1. Install System Dependencies
+
+**Install Node.js (via NVM):**
+You will need Node.js and `npm` to run the React frontend. It is recommended to install it via NVM (Node Version Manager).
+```bash
+# Install NVM
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.4/install.sh | bash
+
+# Refresh your terminal profile (or restart your terminal window)
+source ~/.bashrc  # or source ~/.zshrc
+
+# Install and use the latest LTS version of Node.js
+nvm install --lts
+nvm use --lts
+```
+
+**Install UV (Python Package Manager):**
+UV is a blazingly fast Python package and environment manager. We use it to handle our backend environment.
+```bash
+# Install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Refresh your terminal profile (or restart your terminal window)
+source ~/.bashrc  # or source ~/.zshrc
+```
+
+### 2. Set Up the Application
+
+Navigate to the project directory (or clone the repository if you haven't already):
+```bash
+cd DataAudit
+```
+
+#### Start the FastAPI Backend:
+*(Make sure you are in the root `DataAudit` directory)*
+```bash
+# Create a Python virtual environment using uv
+uv venv
+
+# Activate the virtual environment BEFORE installing dependencies
+source .venv/bin/activate
+
+# Install the required Python packages into the virtual environment
+uv pip install -r requirements.txt
+
+# Start the backend server
+uvicorn backend.main:app --reload
+```
+*The backend will run on `http://127.0.0.1:8000`.*
+
+#### Start the React Frontend:
+Open a **new** terminal window, navigate to the frontend folder, and start the app:
+```bash
+# Navigate to the frontend directory
+cd DataAudit/frontend
+
+# Install node dependencies
+npm install
+
+# Start the frontend development server
+npm run dev
+```
+*The frontend will run on `http://localhost:5173`.*
+
+**3. Using the App:** 
+The application will be accessible via the frontend URL (`http://localhost:5173`) in your browser. Upload the raw data CSV and (optionally) the historic `One Sheet`.
 
 ## Editable Grouping Pairs & Offline Excel Support
 
