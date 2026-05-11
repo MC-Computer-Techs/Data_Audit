@@ -205,9 +205,9 @@ def calc_capped_hours(row):
             
         # Capping each day at 12 hours max
         cap = days * 12 * rooms
-        return min(raw_hours, cap)
+        return round(min(raw_hours, cap), 2)
     except:
-        return 0
+        return 0.0
 
 def process_reservations(df, start_date, end_date):
     df_raw = df.copy()

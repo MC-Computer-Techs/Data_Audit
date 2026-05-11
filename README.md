@@ -78,3 +78,4 @@ Based on the required reporting rules, the application alters the raw data mathe
 - Updated the pipeline to automatically populate the empty "School" column natively in the underlying dataset and Excel exports, copying over the derived "Clean School" categorizations.
 - Altered the core time calculation logic so that the "Time In Use, Hours" column reflects the simple, base duration of the reservation (without the room multiplier), while "ACTUAL hours" retains the room multiplier for total allocated time reporting.
 - Enforced two-decimal-place rounding on all internal time calculations (`Time In Use, Hours` and `ACTUAL hours`) to prevent floating point inaccuracies and align with reporting standards.
+- Updated Top Sheet and PDF export calculations to compute total aggregate values by summing individual pre-rounded numbers, guaranteeing that the itemized columns visually map to the exact grand total without floating point discrepancies.
