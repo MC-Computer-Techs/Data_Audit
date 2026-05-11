@@ -71,3 +71,6 @@ Based on the required reporting rules, the application alters the raw data mathe
 - Fixed missing dependency (`reportlab`) causing PDF export failures. Use `uv pip install -r requirements.txt` within the `.venv` to install all necessary packages.
 - Added type coercion to ensure Excel imports containing numbers or empty values do not cause `float64` type errors when parsed against string-based grouping algorithms.
 - Fixed Excel round-trip hours drift (~48 hours lost on re-import). Root cause was false-positive change detection from type mismatches (`nan` vs empty string, `list` vs stringified list, float precision noise) that caused split per-room hours to overwrite full `ACTUAL hours` in the raw data. The import now skips derived columns and uses tolerance-based comparison for numerics.
+- Improved Grouping Pairs table sorting to always reset to the first page, clarifying that sorting applies globally across the entire dataset rather than just the currently visible page.
+- Removed pagination from the Grouping Pairs tables to allow viewing all records at once while maintaining the collapsible section functionality.
+- Converted all large tables across the application to be individually scrollable within a fixed-height window, preventing extremely large datasets from stretching the entire page vertically.

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Save, ChevronDown, ChevronRight, ChevronUp } from 'lucide-react';
 
-interface PaginatedTableProps {
+interface CollapsibleTableProps {
   title: string;
   data: any[];
   columns: string[];
@@ -10,11 +10,9 @@ interface PaginatedTableProps {
   handleCellChange: (rawId: number, column: string, value: string) => void;
 }
 
-const PaginatedTable = ({ title, data, columns, edits, handleCellChange }: PaginatedTableProps) => {
+const CollapsibleTable = ({ title, data, columns, edits, handleCellChange }: CollapsibleTableProps) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [page, setPage] = useState(0);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'ascending' | 'descending' } | null>(null);
-  const pageSize = 50;
   
   if (!data || data.length === 0) return null;
 
@@ -63,9 +61,6 @@ const PaginatedTable = ({ title, data, columns, edits, handleCellChange }: Pagin
     });
   }
 
-  const totalPages = Math.ceil(sortedData.length / pageSize);
-  const visibleData = sortedData.slice(page * pageSize, (page + 1) * pageSize);
-
   return (
     <div className="mb-4">
       <div 
@@ -105,7 +100,7 @@ const PaginatedTable = ({ title, data, columns, edits, handleCellChange }: Pagin
                 </tr>
               </thead>
               <tbody>
-                {visibleData.map((row: any, i: number) => (
+                {sortedData.map((row: any, i: number) => (
                   <tr key={row._raw_id || i}>
                     {columns.map(col => {
                       const isEditable = !['Calc Hours', 'ACTUAL hours', 'Time In Use, Hours', '_raw_id', 'Filtered Out', 'Filter Reason', 'All Depts'].includes(col);
@@ -131,28 +126,6 @@ const PaginatedTable = ({ title, data, columns, edits, handleCellChange }: Pagin
               </tbody>
             </table>
           </div>
-          
-          {totalPages > 1 && (
-            <div className="flex justify-between items-center p-3 mt-2" style={{ background: 'rgba(15, 23, 42, 0.4)', borderRadius: 'var(--border-radius)' }}>
-              <button 
-                className="btn btn-outline" 
-                style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
-                onClick={() => setPage(Math.max(0, page - 1))}
-                disabled={page === 0}
-              >
-                Previous
-              </button>
-              <span className="font-medium" style={{ fontSize: '0.9rem' }}>Page {page + 1} of {totalPages}</span>
-              <button 
-                className="btn btn-outline" 
-                style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
-                onClick={() => setPage(Math.min(totalPages - 1, page + 1))}
-                disabled={page === totalPages - 1}
-              >
-                Next
-              </button>
-            </div>
-          )}
         </div>
       )}
     </div>
@@ -234,9 +207,9 @@ export default function GroupingPairs({ sessionId, onUpdate }: GroupingPairsProp
         <div key={group.semester} className="mb-8">
           <h3 className="mb-4 text-primary">{group.semester_code} ({group.semester})</h3>
           
-          <PaginatedTable title="Schools" data={group.schools} columns={group.schools.length > 0 ? Object.keys(group.schools[0]) : []} edits={edits} handleCellChange={handleCellChange} />
-          <PaginatedTable title="Departments" data={group.departments} columns={group.departments.length > 0 ? Object.keys(group.departments[0]) : []} edits={edits} handleCellChange={handleCellChange} />
-          <PaginatedTable title="Rooms" data={group.rooms} columns={group.rooms.length > 0 ? Object.keys(group.rooms[0]) : []} edits={edits} handleCellChange={handleCellChange} />
+          <CollapsibleTable title="Schools" data={group.schools} columns={group.schools.length > 0 ? Object.keys(group.schools[0]) : []} edits={edits} handleCellChange={handleCellChange} />
+          <CollapsibleTable title="Departments" data={group.departments} columns={group.departments.length > 0 ? Object.keys(group.departments[0]) : []} edits={edits} handleCellChange={handleCellChange} />
+          <CollapsibleTable title="Rooms" data={group.rooms} columns={group.rooms.length > 0 ? Object.keys(group.rooms[0]) : []} edits={edits} handleCellChange={handleCellChange} />
           <div className="divider"></div>
         </div>
       ))}
