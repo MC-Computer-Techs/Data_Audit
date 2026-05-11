@@ -246,14 +246,19 @@ async def update_groupings(session_id: str, payload: dict):
                     if pd.isna(rooms_val) or rooms_val < 1: rooms_val = 1
                     
                     hours_diff = min(hours_diff, 12.0)
-                    total_hours = max(0, hours_diff) * days * rooms_val
+                    base_hours = round(max(0, hours_diff) * days, 2)
+                    total_hours = round(base_hours * rooms_val, 2)
                 else:
+                    base_hours = 0
                     total_hours = 0
                     
                 cols_to_update = [c for c in ['ACTUAL hours', 'Time In Use, Hours'] if c in raw_df.columns]
                 if not cols_to_update: cols_to_update = ['ACTUAL hours']
                 for c in cols_to_update:
-                    raw_df.loc[mask, c] = total_hours
+                    if c == 'Time In Use, Hours':
+                        raw_df.loc[mask, c] = base_hours
+                    else:
+                        raw_df.loc[mask, c] = total_hours
             except Exception:
                 pass
 

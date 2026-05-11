@@ -45,6 +45,7 @@ def clean_department(dept_str):
     if 'CDI' in d: return 'CDI / Recorded Music'
     if 'ITP' in d or 'IMA' in d or 'Low Res' in d: return 'ITP / IMA / Low Res'
     if d in ['IDM', 'Music Tech', 'MARL', 'MPAP', 'Game Center']: return d
+    if d == 'URPA': return 'Community Partner'
     if d == 'Community Partner': return d
     return d
 
@@ -83,17 +84,66 @@ def map_school(dept_str, school_str, title_str=""):
         # Keep original if provided, but raw data has Role instead
         pass
     
-    steinhardt_depts = ['ALT (Ed Leadership, ECT, and Higher and Post Secondary Education)', 'MARL', 'Music Tech', 'MPAP']
-    tisch_depts = ['CDI / Recorded Music', 'Game Center', 'ITP / IMA / Low Res']
-    tandon_depts = ['IDM']
+    steinhardt_depts = [
+        'ALT (Ed Leadership, ECT, and Higher and Post Secondary Education)', 
+        'MARL', 'Music Tech', 'MPAP',
+        'Sony Audio Institute',
+        'MPAP Other -- Concert Music, Screen Scoring, Songwriting, and Vocal Performance programs',
+        'Music Business', 'STEM From Dance'
+    ]
+    tisch_depts = [
+        'CDI / Recorded Music', 'Game Center', 'ITP / IMA / Low Res',
+        'Game Innovation Lab', 'Tisch Drama', 'Performance Studies',
+        'Tisch Film', 'Dramatic Writing', 'Tisch Dance', 'Mary Markhvida'
+    ]
+    tandon_depts = [
+        'IDM', 'CREO center ', 'Ability Project', 'Future Labs', 'Veterans Lab',
+        'Data Future Lab', 'Urban Future Lab (UFL) / Ninedot Energy (NDE)',
+        'Entrepreneurial Institute', 'Center for Responsible AI',
+        'Institute for Invention, Innovation, and Entrepreneurship',
+        'Computer Science and Engineering (CS and CSE)',
+        'Electrical and Computer Engineering (ECE)', 'NYU Wireless',
+        'Center for Advanced Technology and Telecommunications',
+        'NYU Video Lab', 'NYU Center for Cybersecurity', 'OSIRIS Lab',
+        'Visualization and Data Analytics Lab', 'Center for Urban Science and Progress (CUSP)',
+        'The Marron Institute of Urban Management', 'Digital Learning',
+        'OSLE - Office of Student Leadership and Engagement ',
+        'Civil and urban engineering ', 'Tandon PhD Hub',
+        'EG electrical engineering ', 'CBE Chemical Biomedical Electical Engineering ',
+        'TSLE Tandon student Leadership & Engagement',
+        'Mechanical Space Engineering - MAE', 'Bio Medical Engineering ',
+        'Finance and Risk Engineering - FRE', 'TCS', 'MakerSpace',
+        'Undergraduate Admissions - UGA', 'Applied Physics', 'Tech Kids Unlimited '
+    ]
+    central_depts = [
+        'Provost ', "President's Office", 'University Development and Alumni Relations (UDAR)',
+        'Admissions', 'Wasserman Center', 'CBS'
+    ]
+    greater_nyu_depts = [
+        'College of Arts and Sciences (CAS)', 'Gallatin', 'Law School ', 'Liberal Studies ', 'Linguistics'
+    ]
+    community_partner_depts = [
+        'The Issue Project Room', 'Brooklyn Book Festival', 'Brooklyn Caribbean Literary Festival'
+    ]
     
+    generic_depts = ["Dean's Office", "Student Affairs", "Student Affairs ", "AMC - Administrative Management Council"]
+    
+    # Try exact matches first
     if d in steinhardt_depts: return 'Steinhardt'
     if d in tisch_depts: return 'Tisch'
     if d in tandon_depts: return 'Tandon'
-    if d == 'Community Partner': return 'URPA / Community Partner'
+    if d in central_depts: return 'Central'
+    if d in greater_nyu_depts: return 'Greater NYU'
+    if d == 'Community Partner' or d in community_partner_depts: return 'URPA / Community Partner'
     
-    # Infer from title if department mapping fell through
     t = str(title_str).lower()
+    
+    if d in generic_depts:
+        if 'tisch' in t or 'film' in t or 'drama' in t: return 'Tisch'
+        if 'steinhardt' in t: return 'Steinhardt'
+        if any(kw in t for kw in ['tandon', 'cusp', 'ece', 'sase', 'nsbe']): return 'Tandon'
+        
+    # Infer from title if department mapping fell through
     if 'tisch' in t or 'film' in t or 'drama' in t: return 'Tisch'
     if 'steinhardt' in t: return 'Steinhardt'
     if any(kw in t for kw in ['tandon', 'cusp', 'ece', 'sase', 'nsbe', 'terra', 'csaw', 'mae seminar', 'cybersecurity']): return 'Tandon'
@@ -212,9 +262,13 @@ def process_reservations(df, start_date, end_date):
                             # Enforce the strict 12-hour daily maximum per room natively
                             hours_diff = min(hours_diff, 12.0)
                             
-                            total_hours = max(0, hours_diff) * days * rooms_val
+                            base_hours = round(max(0, hours_diff) * days, 2)
+                            total_hours = round(base_hours * rooms_val, 2)
                             for fix_col in cols_to_fix:
-                                df_raw.at[idx, fix_col] = float(total_hours)
+                                if fix_col == 'Time In Use, Hours':
+                                    df_raw.at[idx, fix_col] = float(base_hours)
+                                else:
+                                    df_raw.at[idx, fix_col] = float(total_hours)
                 except Exception:
                     pass
     
@@ -301,6 +355,16 @@ def process_reservations(df, start_date, end_date):
     # Extract multiple departments from title per Reference.md
     df['All Depts'] = df.apply(extract_departments, axis=1)
     
+    def get_all_schools(row):
+        schools = set()
+        for d in row['All Depts']:
+            schools.add(map_school(d, '', row.get('Reservation Title', '')))
+        return ', '.join(sorted(list(schools)))
+        
+    df['School'] = df.apply(get_all_schools, axis=1)
+    df_raw['All Depts'] = df_raw.apply(extract_departments, axis=1)
+    df_raw['School'] = df_raw.apply(get_all_schools, axis=1)
+    
     # Split departments for Dept/School calculation
     dept_rows = []
     for idx, row in df.iterrows():
@@ -308,6 +372,7 @@ def process_reservations(df, start_date, end_date):
             new_row = row.copy()
             new_row['Clean Department'] = d
             new_row['Clean School'] = map_school(d, '', row.get('Reservation Title', ''))
+            new_row['School'] = new_row['Clean School']
             dept_rows.append(new_row)
             
     df_depts_schools = pd.DataFrame(dept_rows).reset_index(drop=True)
@@ -410,7 +475,7 @@ def generate_top_sheet(df_pack, start_date, end_date, semesters):
     add_section("Reservations per program:", "Clean Department", prog_order, df_depts_schools)
     add_hours_section("Hours per Program:", "Clean Department", prog_order, df_depts_schools)
     
-    school_order = ['Tandon', 'Tisch', 'Steinhardt', 'Provost', 'URPA / Community Partner', 'Central', 'Other Schools']
+    school_order = ['Tandon', 'Tisch', 'Steinhardt', 'Provost', 'URPA / Community Partner', 'Central', 'Greater NYU', 'Other Schools']
     add_section("Reservations per School:", "Clean School", school_order, df_depts_schools)
     output_rows.append(["", "", "", "", "", ""])
     add_hours_section("Hours per School:", "Clean School", school_order, df_depts_schools)
@@ -717,14 +782,19 @@ def process_excel_import(uploaded_file, start_date, end_date):
                             if pd.isna(rooms_val) or rooms_val < 1: rooms_val = 1
                             
                             hours_diff = min(hours_diff, 12.0)
-                            total_hours = max(0, hours_diff) * days * rooms_val
+                            base_hours = round(max(0, hours_diff) * days, 2)
+                            total_hours = round(base_hours * rooms_val, 2)
                         else:
+                            base_hours = 0
                             total_hours = 0
                             
                         cols_to_update = [c for c in ['ACTUAL hours', 'Time In Use, Hours'] if c in raw_df.columns]
                         if not cols_to_update: cols_to_update = ['ACTUAL hours']
                         for c in cols_to_update:
-                            raw_df.loc[mask, c] = total_hours
+                            if c == 'Time In Use, Hours':
+                                raw_df.loc[mask, c] = base_hours
+                            else:
+                                raw_df.loc[mask, c] = total_hours
                     except Exception:
                         pass
                         
