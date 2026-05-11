@@ -12,6 +12,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [edits, setEdits] = useState<any[]>([]);
 
   const [startDate, setStartDate] = useState('2024-09-01');
   const [endDate, setEndDate] = useState('2025-08-31');
@@ -148,11 +149,11 @@ function App() {
 
           <div className="tabs-container">
             {activeTab === 'top_sheet' && <TopSheet sessionId={sessionId} />}
-            {activeTab === 'grouping_pairs' && <GroupingPairs sessionId={sessionId} onUpdate={() => {
+            {activeTab === 'grouping_pairs' && <GroupingPairs sessionId={sessionId} edits={edits} setEdits={setEdits} onUpdate={() => {
               // Trigger a refresh logic if needed, but the child components handle their own data fetches
             }} />}
             {activeTab === 'one_sheet' && <OneSheet sessionId={sessionId} />}
-            {activeTab === 'filtered' && <FilteredBookings sessionId={sessionId} />}
+            {activeTab === 'filtered' && <FilteredBookings sessionId={sessionId} edits={edits} setEdits={setEdits} />}
           </div>
         </div>
       )}

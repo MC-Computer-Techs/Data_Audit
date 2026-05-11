@@ -78,6 +78,7 @@ const CollapsibleTable = ({ title, data, columns, edits, handleCellChange }: Col
             <table>
               <thead>
                 <tr>
+                  <th style={{ width: '80px' }}>Include</th>
                   {columns.map(col => (
                     <th 
                       key={col} 
@@ -100,8 +101,20 @@ const CollapsibleTable = ({ title, data, columns, edits, handleCellChange }: Col
                 </tr>
               </thead>
               <tbody>
-                {sortedData.map((row: any, i: number) => (
+                {sortedData.map((row: any, i: number) => {
+                  const filterEdit = edits.find((e: any) => e.raw_id === row._raw_id && e.column === 'Manual Override Filtered');
+                  const isIncluded = filterEdit ? !filterEdit.value : true; 
+
+                  return (
                   <tr key={row._raw_id || i}>
+                    <td className="text-center">
+                      <input 
+                        type="checkbox" 
+                        checked={isIncluded} 
+                        onChange={(e) => handleCellChange(row._raw_id, 'Manual Override Filtered', !e.target.checked)} 
+                        style={{ cursor: 'pointer', transform: 'scale(1.2)' }}
+                      />
+                    </td>
                     {columns.map(col => {
                       const isEditable = !['Calc Hours', 'ACTUAL hours', 'Time In Use, Hours', '_raw_id', 'Filtered Out', 'Filter Reason', 'All Depts'].includes(col);
                       
@@ -122,7 +135,8 @@ const CollapsibleTable = ({ title, data, columns, edits, handleCellChange }: Col
                       return <td key={col}>{row[col] !== null ? String(row[col]) : ''}</td>;
                     })}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -134,14 +148,15 @@ const CollapsibleTable = ({ title, data, columns, edits, handleCellChange }: Col
 
 interface GroupingPairsProps {
   sessionId: string;
+  edits: any[];
+  setEdits: React.Dispatch<React.SetStateAction<any[]>>;
   onUpdate: () => void;
 }
 
-export default function GroupingPairs({ sessionId, onUpdate }: GroupingPairsProps) {
+export default function GroupingPairs({ sessionId, edits, setEdits, onUpdate }: GroupingPairsProps) {
   const [groupings, setGroupings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [edits, setEdits] = useState<any[]>([]);
 
   const fetchGroupings = async () => {
     try {
@@ -158,7 +173,7 @@ export default function GroupingPairs({ sessionId, onUpdate }: GroupingPairsProp
     fetchGroupings();
   }, [sessionId]);
 
-  const handleCellChange = (rawId: number, column: string, value: string) => {
+  const handleCellChange = (rawId: number, column: string, value: any) => {
     setEdits(prev => {
       const existing = prev.findIndex(e => e.raw_id === rawId && e.column === column);
       if (existing >= 0) {

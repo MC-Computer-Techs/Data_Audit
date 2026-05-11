@@ -335,6 +335,17 @@ def process_reservations(df, start_date, end_date):
     df_raw.loc[~valid_date, 'Filtered Out'] = True
     df_raw.loc[~valid_date, 'Filter Reason'] += 'Outside Selected Date Range; '
     
+    # 4. Apply Manual Overrides
+    if 'Manual Override Filtered' in df_raw.columns:
+        override_true = df_raw['Manual Override Filtered'] == True
+        override_false = df_raw['Manual Override Filtered'] == False
+        
+        df_raw.loc[override_true, 'Filtered Out'] = True
+        df_raw.loc[override_true, 'Filter Reason'] = 'Manual Override; '
+        
+        df_raw.loc[override_false, 'Filtered Out'] = False
+        df_raw.loc[override_false, 'Filter Reason'] = ''
+        
     # Create the valid subset to continue normal processing
     df = df_raw[~df_raw['Filtered Out']].copy()
     

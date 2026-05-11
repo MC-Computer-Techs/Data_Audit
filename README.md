@@ -80,7 +80,8 @@ The application will be accessible via the frontend URL (`http://localhost:5173`
 ## Editable Grouping Pairs & Offline Excel Support
 
 Once the data is processed, you can view the detailed grouping pairs in the **Grouping Pairs** tab. These tables are now fully interactive:
-- You can directly edit the values (e.g., `Clean School`, `Calc Hours`) within the Grouping Pairs tables.
+- **Manual Filter Overrides**: You will see an `Include` checkbox on every single booking row across both the `Grouping Pairs` and `Filtered Bookings` tabs. Unchecking a box allows you to manually filter a booking out of the dataset (bypassing automated rules), while checking a box in the filtered tab manually reinstates a rejected booking into the active dataset!
+- You can directly edit the text values (e.g., `Clean School`, `Calc Hours`) within the Grouping Pairs tables.
 - When you are ready, press the **Save Changes** button. Any changes made will re-calculate the **Top Sheet Overview** to reflect the updated metrics.
 - The underlying CSV files for both the Grouping Pairs and the Top Sheet are immediately re-exported to your local directory.
 
