@@ -74,3 +74,8 @@ Based on the required reporting rules, the application alters the raw data mathe
 - Improved Grouping Pairs table sorting to always reset to the first page, clarifying that sorting applies globally across the entire dataset rather than just the currently visible page.
 - Removed pagination from the Grouping Pairs tables to allow viewing all records at once while maintaining the collapsible section functionality.
 - Converted all large tables across the application to be individually scrollable within a fixed-height window, preventing extremely large datasets from stretching the entire page vertically.
+- Integrated extended department-to-school mappings directly into the data processor algorithm, improving school categorization accuracy without creating redundant department groupings (e.g., mapping "URPA" to "Community Partner").
+- Updated the pipeline to automatically populate the empty "School" column natively in the underlying dataset and Excel exports, copying over the derived "Clean School" categorizations.
+- Altered the core time calculation logic so that the "Time In Use, Hours" column reflects the simple, base duration of the reservation (without the room multiplier), while "ACTUAL hours" retains the room multiplier for total allocated time reporting.
+- Enforced two-decimal-place rounding on all internal time calculations (`Time In Use, Hours` and `ACTUAL hours`) to prevent floating point inaccuracies and align with reporting standards.
+- Updated Top Sheet and PDF export calculations to compute total aggregate values by summing individual pre-rounded numbers, guaranteeing that the itemized columns visually map to the exact grand total without floating point discrepancies.
