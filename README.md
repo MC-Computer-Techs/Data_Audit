@@ -1,6 +1,6 @@
 # Reservation Data Audit Application
 
-A Streamlit application to parse, audit, and aggregate Bookings Tool reservation data into reporting matrices for academic year reporting.
+A full-stack application using FastAPI and React to parse, audit, and aggregate Bookings Tool reservation data into reporting matrices for academic year reporting.
 
 ## Overview
 
@@ -8,45 +8,37 @@ This application takes the raw reservations export (`All_BT_Reservations.csv`) a
 
 ## How to Run
 
-1. Make sure you have `uv` installed. Use `uv venv` to create a virtual environment, and use that when developing. If not in the virtual environment, use `source .venv/bin/activate` to get into it.
+1. Make sure you have `uv` and `npm` installed. Use `uv venv` to create a virtual environment for the backend.
 2. Clone this repository and navigate to the directory:
    ```bash
    cd DataAudit
    ```
-3. Install dependencies:
+3. Set up and start the **FastAPI Backend**:
+   *(Make sure you are in the root `DataAudit` directory, not the `frontend` folder)*
    ```bash
-   uv pip install -r requirements.txt
-   ```
-   *(Alternatively, run `./setup.sh` if it uses uv under the hood).*
-   
-   *Note: The application uses absolute imports (e.g., `from src.data_processor import ...`) which is resolved correctly when running `streamlit run src/app.py` from the project root.*
-4. To run the application, make sure your environment is activated:
-   ```bash
-   source .venv/bin/activate
-   ```
-   *Troubleshooting tip: If your python environment gets messed up, try recreating it:*
-   ```bash
-   rm -rf .venv
    uv venv
    source .venv/bin/activate
    uv pip install -r requirements.txt
+   uvicorn backend.main:app --reload
    ```
-   *If `uv` commands hang or freeze indefinitely without output, macOS Gatekeeper may be blocking the executable in the background. To fix this, remove the quarantine flag and kill stuck instances:*
+   *The backend will run on `http://127.0.0.1:8000`.*
+   
+4. Set up and start the **React Frontend**:
+   Open a new terminal window:
    ```bash
-   xattr -d com.apple.quarantine ~/.local/bin/uv
-   killall -9 uv
+   cd frontend
+   npm install
+   npm run dev
    ```
-5. Run the Streamlit app using `uv`:
-   ```bash
-   uv run streamlit run src/app.py
-   ```
-6. The application will open in your browser automatically.
-7. Upload the raw data CSV and (optionally) the historic `One Sheet`.
+   *The frontend will run on `http://localhost:5173`.*
+
+5. The application will be accessible via the frontend URL in your browser.
+6. Upload the raw data CSV and (optionally) the historic `One Sheet`.
 
 ## Editable Grouping Pairs & Offline Excel Support
 
 Once the data is processed, you can view the detailed grouping pairs in the **Grouping Pairs** tab. These tables are now fully interactive:
-- You can directly edit the values (e.g., `Clean School`, `Calc Hours`) within the Grouping Pairs tables via the Streamlit UI.
+- You can directly edit the values (e.g., `Clean School`, `Calc Hours`) within the Grouping Pairs tables.
 - When you are ready, press the **Save Changes** button. Any changes made will re-calculate the **Top Sheet Overview** to reflect the updated metrics.
 - The underlying CSV files for both the Grouping Pairs and the Top Sheet are immediately re-exported to your local directory.
 
@@ -73,3 +65,12 @@ Based on the required reporting rules, the application alters the raw data mathe
 * **Missing Departments**: Over 900+ raw entries lack a formal Department assignment. The scripts infer the target Department structurally by searching the `Reservation Title` for common program acronyms (ITP, IDM, Game Center, Music Tech, etc.). If none are found, it falls back to `Other Group(s)`.
 * **Missing Schools**: If a department is inferred as `Other Group(s)`, the application takes an extra step to scan the `Reservation Title` for school keywords (e.g., Tisch, Steinhardt, Tandon, CUSP, ECE, CSAW) and assigns them to the correct School metric instead of defaulting to `Other Schools`.
 * **Overnight Day Rules**: If a booking is strictly overnight (e.g., its start time is later in the day than its end time), the span of calendar dates is appropriately subtracted by 1 to represent the true number of active nights/days used for the booking. The total hours are then directly multiplied by these actual days.
+
+## Recent Updates
+
+- Fixed missing dependency (`reportlab`) causing PDF export failures. Use `uv pip install -r requirements.txt` within the `.venv` to install all necessary packages.
+- Added type coercion to ensure Excel imports containing numbers or empty values do not cause `float64` type errors when parsed against string-based grouping algorithms.
+- Fixed Excel round-trip hours drift (~48 hours lost on re-import). Root cause was false-positive change detection from type mismatches (`nan` vs empty string, `list` vs stringified list, float precision noise) that caused split per-room hours to overwrite full `ACTUAL hours` in the raw data. The import now skips derived columns and uses tolerance-based comparison for numerics.
+- Improved Grouping Pairs table sorting to always reset to the first page, clarifying that sorting applies globally across the entire dataset rather than just the currently visible page.
+- Removed pagination from the Grouping Pairs tables to allow viewing all records at once while maintaining the collapsible section functionality.
+- Converted all large tables across the application to be individually scrollable within a fixed-height window, preventing extremely large datasets from stretching the entire page vertically.
