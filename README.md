@@ -100,7 +100,7 @@ You can also generate a nicely formatted, highly polished PDF version of your To
 ## Data Filtering & Calculation Rules
 
 Based on the required reporting rules, the application alters the raw data mathematically:
-* **Status**: ONLY events with an `End Event Status` of `Approved` or `Checked out` are counted. `No shows`, `Canceled`, `Declined`, and `Requested` events are excluded.
+* **Status**: ONLY events with an `End Event Status` containing `Approved` or `Checked out` are counted. However, because statuses are listed chronologically as a comma-separated history, the application actively scans the entire string. If the history contains `No show`, `Canceled`, or `Declined` at any point, the event is automatically excluded, even if it was previously approved. Additionally, if an event was `Checked In`, it MUST also be `Checked Out` to be considered valid; otherwise, it is excluded.
 * **Maintenance**: Any event with "maintenance" in the Booking Type or Reservation Title is excluded.
 * **Hour Cap**: A strict 12-hour per-day maximum cap is enforced on the duration sums to prevent multi-day/week long bookings from breaking the true active usage reporting.
 * **Multiple Hosts**: If a single reservation title implies multiple groups (e.g., "IDM & ITP Event"), the script automatically duplicates the event into both groups to ensure the activity is properly attributed to all sponsors. 
