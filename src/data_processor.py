@@ -282,12 +282,8 @@ def process_reservations(df, start_date, end_date):
         
         def is_valid_status(s):
             has_checked_in = 'checked in' in s
-            has_checked_out = 'checked out' in s
-            
-            if has_checked_in and not has_checked_out:
-                return False
-                
-            has_approval = 'approved' in s or has_checked_out
+            has_checked_out = 'checked out' in s  
+            has_approval = 'approved' in s or has_checked_out or has_checked_in
             has_rejection = any(bad in s for bad in ['declined', 'canceled', 'cancelled', 'no show'])
             return has_approval and not has_rejection
             
