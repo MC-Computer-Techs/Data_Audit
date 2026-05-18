@@ -1,147 +1,20 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Save, ChevronDown, ChevronRight, ChevronUp } from 'lucide-react';
+import { Save, X } from 'lucide-react';
 
-interface CollapsibleTableProps {
-  title: string;
-  data: any[];
-  columns: string[];
-  edits: any[];
-  handleCellChange: (rawId: number, column: string, value: string) => void;
-}
-
-const CollapsibleTable = ({ title, data, columns, edits, handleCellChange }: CollapsibleTableProps) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'ascending' | 'descending' } | null>(null);
-  
-  if (!data || data.length === 0) return null;
-
-  const handleSort = (key: string) => {
-    let direction: 'ascending' | 'descending' = 'ascending';
-    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'ascending') {
-      direction = 'descending';
-    }
-    setSortConfig({ key, direction });
-  };
-
-  const sortedData = [...data];
-  if (sortConfig !== null) {
-    sortedData.sort((a, b) => {
-      let aVal = a[sortConfig.key];
-      let bVal = b[sortConfig.key];
-      
-      const aEdit = edits.find(e => e.raw_id === a._raw_id && e.column === sortConfig.key);
-      const bEdit = edits.find(e => e.raw_id === b._raw_id && e.column === sortConfig.key);
-      if (aEdit) aVal = aEdit.value;
-      if (bEdit) bVal = bEdit.value;
-      
-      if (aVal === null || aVal === undefined) aVal = '';
-      if (bVal === null || bVal === undefined) bVal = '';
-
-      if (typeof aVal === 'number' && typeof bVal === 'number') {
-        return sortConfig.direction === 'ascending' ? aVal - bVal : bVal - aVal;
-      }
-      
-      const aStr = String(aVal).toLowerCase();
-      const bStr = String(bVal).toLowerCase();
-
-      if (!isNaN(Number(aStr)) && !isNaN(Number(bStr)) && aStr.trim() !== '' && bStr.trim() !== '') {
-         const aNum = Number(aStr);
-         const bNum = Number(bStr);
-         return sortConfig.direction === 'ascending' ? aNum - bNum : bNum - aNum;
-      }
-
-      if (aStr < bStr) {
-        return sortConfig.direction === 'ascending' ? -1 : 1;
-      }
-      if (aStr > bStr) {
-        return sortConfig.direction === 'ascending' ? 1 : -1;
-      }
-      return 0;
-    });
-  }
-
-  return (
-    <div className="mb-4">
-      <div 
-        className="flex items-center cursor-pointer p-3 transition"
-        style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid var(--glass-border)', borderRadius: 'var(--border-radius)' }}
-        onClick={() => setIsOpen(!isOpen)}
-      >
-        {isOpen ? <ChevronDown size={20} className="mr-2" style={{ color: 'var(--primary-accent)' }} /> : <ChevronRight size={20} className="mr-2" style={{ color: 'var(--primary-accent)' }} />}
-        <h4 className="m-0 flex-1" style={{ margin: 0 }}>{title} <span className="text-sm font-normal ml-2" style={{ color: 'var(--text-secondary)' }}>({data.length} records)</span></h4>
-      </div>
-      
-      {isOpen && (
-        <div className="mt-3">
-          <div className="table-container mb-3">
-            <table>
-              <thead>
-                <tr>
-                  {columns.map(col => (
-                    <th 
-                      key={col} 
-                      onClick={() => handleSort(col)}
-                      style={{ cursor: 'pointer', userSelect: 'none' }}
-                      className="hover:bg-slate-700 transition group"
-                    >
-                      <div className="flex items-center">
-                        {col}
-                        <span className={`ml-1 flex items-center transition-opacity ${sortConfig?.key === col ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'}`}>
-                          {sortConfig?.key === col ? (
-                            sortConfig.direction === 'ascending' ? <ChevronUp size={14} className="text-primary" /> : <ChevronDown size={14} className="text-primary" />
-                          ) : (
-                            <ChevronDown size={14} />
-                          )}
-                        </span>
-                      </div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sortedData.map((row: any, i: number) => (
-                  <tr key={row._raw_id || i}>
-                    {columns.map(col => {
-                      const isEditable = !['Calc Hours', 'ACTUAL hours', 'Time In Use, Hours', '_raw_id', 'Filtered Out', 'Filter Reason', 'All Depts'].includes(col);
-                      
-                      const edit = edits.find((e: any) => e.raw_id === row._raw_id && e.column === col);
-                      const displayValue = edit ? edit.value : row[col];
-
-                      if (isEditable) {
-                        return (
-                          <td key={col} className="editable-cell">
-                            <input 
-                              type="text" 
-                              value={displayValue || ''} 
-                              onChange={(e) => handleCellChange(row._raw_id, col, e.target.value)}
-                            />
-                          </td>
-                        );
-                      }
-                      return <td key={col}>{row[col] !== null ? String(row[col]) : ''}</td>;
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+import CollapsibleTable from './CollapsibleTable';
 
 interface GroupingPairsProps {
   sessionId: string;
+  edits: any[];
+  setEdits: React.Dispatch<React.SetStateAction<any[]>>;
   onUpdate: () => void;
 }
 
-export default function GroupingPairs({ sessionId, onUpdate }: GroupingPairsProps) {
+export default function GroupingPairs({ sessionId, edits, setEdits, onUpdate }: GroupingPairsProps) {
   const [groupings, setGroupings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [edits, setEdits] = useState<any[]>([]);
 
   const fetchGroupings = async () => {
     try {
@@ -158,7 +31,7 @@ export default function GroupingPairs({ sessionId, onUpdate }: GroupingPairsProp
     fetchGroupings();
   }, [sessionId]);
 
-  const handleCellChange = (rawId: number, column: string, value: string) => {
+  const handleCellChange = (rawId: number, column: string, value: any) => {
     setEdits(prev => {
       const existing = prev.findIndex(e => e.raw_id === rawId && e.column === column);
       if (existing >= 0) {
@@ -194,22 +67,34 @@ export default function GroupingPairs({ sessionId, onUpdate }: GroupingPairsProp
           <h2>Generated Grouping Pairs</h2>
           <p className="mb-0">Edit values below to update quantities. Click save to recalculate totals.</p>
         </div>
-        <button 
-          onClick={handleSave} 
-          className="btn btn-primary"
-          disabled={edits.length === 0 || saving}
-        >
-          {saving ? <span className="spinner"></span> : <><Save size={18} /> Save Changes</>}
-        </button>
+        <div className="flex gap-4">
+          {edits.length > 0 && (
+            <button 
+              onClick={() => setEdits([])} 
+              className="btn"
+              style={{ borderColor: 'var(--accent-red)', color: 'var(--accent-red)', background: 'transparent' }}
+              disabled={saving}
+            >
+              <X size={18} /> Discard Changes
+            </button>
+          )}
+          <button 
+            onClick={handleSave} 
+            className="btn btn-primary"
+            disabled={edits.length === 0 || saving}
+          >
+            {saving ? <span className="spinner"></span> : <><Save size={18} /> Save Changes</>}
+          </button>
+        </div>
       </div>
 
       {groupings.map((group: any) => (
         <div key={group.semester} className="mb-8">
           <h3 className="mb-4 text-primary">{group.semester_code} ({group.semester})</h3>
           
-          <CollapsibleTable title="Schools" data={group.schools} columns={group.schools.length > 0 ? Object.keys(group.schools[0]) : []} edits={edits} handleCellChange={handleCellChange} />
-          <CollapsibleTable title="Departments" data={group.departments} columns={group.departments.length > 0 ? Object.keys(group.departments[0]) : []} edits={edits} handleCellChange={handleCellChange} />
-          <CollapsibleTable title="Rooms" data={group.rooms} columns={group.rooms.length > 0 ? Object.keys(group.rooms[0]) : []} edits={edits} handleCellChange={handleCellChange} />
+          <CollapsibleTable title="Schools" data={group.schools} columns={group.schools.length > 0 ? Object.keys(group.schools[0]) : []} edits={edits} handleCellChange={handleCellChange} defaultIncluded={true} />
+          <CollapsibleTable title="Departments" data={group.departments} columns={group.departments.length > 0 ? Object.keys(group.departments[0]) : []} edits={edits} handleCellChange={handleCellChange} defaultIncluded={true} />
+          <CollapsibleTable title="Rooms" data={group.rooms} columns={group.rooms.length > 0 ? Object.keys(group.rooms[0]) : []} edits={edits} handleCellChange={handleCellChange} defaultIncluded={true} />
           <div className="divider"></div>
         </div>
       ))}

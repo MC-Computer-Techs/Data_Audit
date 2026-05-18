@@ -279,7 +279,19 @@ def process_reservations(df, start_date, end_date):
     # 1. Filter Statuses if Approved or Checked Out is not in the list in End Event Status cell, seperate by commas
     if 'End Event Status' in df_raw.columns:
         status_col = df_raw['End Event Status'].astype(str).str.lower()
-        valid_status = status_col.apply(lambda x: 'approved' in x or 'checked out' in x)
+        
+        def is_valid_status(s):
+            has_checked_in = 'checked in' in s
+            has_checked_out = 'checked out' in s
+            
+            if has_checked_in and not has_checked_out:
+                return False
+                
+            has_approval = 'approved' in s or has_checked_out
+            has_rejection = any(bad in s for bad in ['declined', 'canceled', 'cancelled', 'no show'])
+            return has_approval and not has_rejection
+            
+        valid_status = status_col.apply(is_valid_status)
         failed_rows = df_raw[~valid_status]
         for idx in failed_rows.index:
             status_val = str(df_raw.loc[idx, 'End Event Status']).strip()
@@ -323,6 +335,17 @@ def process_reservations(df, start_date, end_date):
     df_raw.loc[~valid_date, 'Filtered Out'] = True
     df_raw.loc[~valid_date, 'Filter Reason'] += 'Outside Selected Date Range; '
     
+    # 4. Apply Manual Overrides
+    if 'Manual Override Filtered' in df_raw.columns:
+        override_true = df_raw['Manual Override Filtered'] == True
+        override_false = df_raw['Manual Override Filtered'] == False
+        
+        df_raw.loc[override_true, 'Filtered Out'] = True
+        df_raw.loc[override_true, 'Filter Reason'] = 'Manual Override; '
+        
+        df_raw.loc[override_false, 'Filtered Out'] = False
+        df_raw.loc[override_false, 'Filter Reason'] = ''
+        
     # Create the valid subset to continue normal processing
     df = df_raw[~df_raw['Filtered Out']].copy()
     

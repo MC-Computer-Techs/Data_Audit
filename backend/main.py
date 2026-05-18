@@ -107,6 +107,13 @@ async def upload_files(
         other_schools_path = os.path.join(other_dir, "Other_Schools.csv")
         other_schools_df.to_csv(other_schools_path, index=False)
 
+        raw_df = processed_df['raw_annotated']
+        if 'Filter Reason' in raw_df.columns:
+            misformatted_df = raw_df[raw_df['Filter Reason'].astype(str).str.contains('Room 000', na=False)]
+            if not misformatted_df.empty:
+                misformatted_path = os.path.join(other_dir, "Misformatted.csv")
+                misformatted_df.to_csv(misformatted_path, index=False)
+
         ts_path = os.path.join(base_dir, f"Top_Sheet_{s_date.strftime('%Y-%m-%d')}_to_{e_date.strftime('%Y-%m-%d')}.csv")
         top_sheet_df.to_csv(ts_path, index=False, header=False)
         
@@ -206,6 +213,9 @@ async def update_groupings(session_id: str, payload: dict):
         elif col == 'Clean School': continue # Derived strictly from Department
         elif col == 'Calc Hours':
             mapped_col = 'ACTUAL hours' if 'ACTUAL hours' in raw_df.columns else 'Time In Use, Hours'
+        elif col == 'Manual Override Filtered':
+            if 'Manual Override Filtered' not in raw_df.columns:
+                raw_df['Manual Override Filtered'] = pd.NA
 
         time_edited = mapped_col in ['Booking Start Date', 'Booking End Date', 'Booking Start Time', 'Booking End Time']
 
@@ -213,7 +223,7 @@ async def update_groupings(session_id: str, payload: dict):
             mask = raw_df['_raw_id'] == raw_id
             
             # Coerce to string if target column expects string
-            if new_val is not None and not isinstance(new_val, str):
+            if new_val is not None and not isinstance(new_val, str) and not isinstance(new_val, bool) and mapped_col != 'Manual Override Filtered':
                 if pd.api.types.is_string_dtype(raw_df[mapped_col]):
                     if isinstance(new_val, float) and new_val.is_integer():
                         new_val = str(int(new_val))

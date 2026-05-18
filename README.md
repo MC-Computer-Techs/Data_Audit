@@ -80,7 +80,8 @@ The application will be accessible via the frontend URL (`http://localhost:5173`
 ## Editable Grouping Pairs & Offline Excel Support
 
 Once the data is processed, you can view the detailed grouping pairs in the **Grouping Pairs** tab. These tables are now fully interactive:
-- You can directly edit the values (e.g., `Clean School`, `Calc Hours`) within the Grouping Pairs tables.
+- **Manual Filter Overrides**: You will see an `Include` checkbox on every single booking row across both the `Grouping Pairs` and `Filtered Bookings` tabs. Unchecking a box allows you to manually filter a booking out of the dataset (bypassing automated rules), while checking a box in the filtered tab manually reinstates a rejected booking into the active dataset!
+- You can directly edit the text values (e.g., `Clean School`, `Calc Hours`) within the Grouping Pairs tables.
 - When you are ready, press the **Save Changes** button. Any changes made will re-calculate the **Top Sheet Overview** to reflect the updated metrics.
 - The underlying CSV files for both the Grouping Pairs and the Top Sheet are immediately re-exported to your local directory.
 
@@ -100,7 +101,7 @@ You can also generate a nicely formatted, highly polished PDF version of your To
 ## Data Filtering & Calculation Rules
 
 Based on the required reporting rules, the application alters the raw data mathematically:
-* **Status**: ONLY events with an `End Event Status` of `Approved` or `Checked out` are counted. `No shows`, `Canceled`, `Declined`, and `Requested` events are excluded.
+* **Status**: ONLY events with an `End Event Status` containing `Approved` or `Checked out` are counted. However, because statuses are listed chronologically as a comma-separated history, the application actively scans the entire string. If the history contains `No show`, `Canceled`, or `Declined` at any point, the event is automatically excluded, even if it was previously approved. Additionally, if an event was `Checked In`, it MUST also be `Checked Out` to be considered valid; otherwise, it is excluded.
 * **Maintenance**: Any event with "maintenance" in the Booking Type or Reservation Title is excluded.
 * **Hour Cap**: A strict 12-hour per-day maximum cap is enforced on the duration sums to prevent multi-day/week long bookings from breaking the true active usage reporting.
 * **Multiple Hosts**: If a single reservation title implies multiple groups (e.g., "IDM & ITP Event"), the script automatically duplicates the event into both groups to ensure the activity is properly attributed to all sponsors. 
@@ -121,3 +122,6 @@ Based on the required reporting rules, the application alters the raw data mathe
 - Altered the core time calculation logic so that the "Time In Use, Hours" column reflects the simple, base duration of the reservation (without the room multiplier), while "ACTUAL hours" retains the room multiplier for total allocated time reporting.
 - Enforced two-decimal-place rounding on all internal time calculations (`Time In Use, Hours` and `ACTUAL hours`) to prevent floating point inaccuracies and align with reporting standards.
 - Updated Top Sheet and PDF export calculations to compute total aggregate values by summing individual pre-rounded numbers, guaranteeing that the itemized columns visually map to the exact grand total without floating point discrepancies.
+- Added multi-row paste support in the Grouping Pairs tables, allowing users to copy multiple column values (e.g. from Excel) and paste them simultaneously across multiple rows.
+- Added multi-row selection and editing: Users can now click and drag, shift-click, or Cmd/Ctrl-click to select multiple cells in the same column. Typing in any of the selected cells will automatically synchronize the edits across all highlighted rows.
+- Added a "Discard Changes" button that appears alongside the "Save Changes" button, giving users a quick way to revert all unsaved table modifications at once.
