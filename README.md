@@ -125,3 +125,15 @@ Based on the required reporting rules, the application alters the raw data mathe
 - Added multi-row paste support in the Grouping Pairs tables, allowing users to copy multiple column values (e.g. from Excel) and paste them simultaneously across multiple rows.
 - Added multi-row selection and editing: Users can now click and drag, shift-click, or Cmd/Ctrl-click to select multiple cells in the same column. Typing in any of the selected cells will automatically synchronize the edits across all highlighted rows.
 - Added a "Discard Changes" button that appears alongside the "Save Changes" button, giving users a quick way to revert all unsaved table modifications at once.
+
+## Native macOS Application
+
+The project has been ported to a fully native, standalone macOS application using Swift and SwiftUI. This eliminates the need for Node.js, Python, or local servers.
+
+### Building and Running the macOS App
+1. Open the `DataAuditMac` directory.
+2. Double click the `Package.swift` file to open it in Xcode.
+3. Select the `DataAuditMac` executable target in the top toolbar.
+4. Click the **Run** button (or press `Cmd + R`) to compile and launch the application natively on your Mac.
+
+The macOS app supports importing `.csv` files natively and generates PDFs using macOS's built-in `PDFKit`.
