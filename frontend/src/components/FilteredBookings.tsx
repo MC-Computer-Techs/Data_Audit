@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Save } from 'lucide-react';
+import { Save, X } from 'lucide-react';
 import CollapsibleTable from './CollapsibleTable';
 
 interface FilteredBookingsProps {
@@ -73,13 +73,25 @@ export default function FilteredBookings({ sessionId, edits, setEdits }: Filtere
             There are <strong>{total}</strong> bookings filtered out.
           </div>
         </div>
-        <button 
-          onClick={handleSave} 
-          className="btn btn-primary"
-          disabled={edits.length === 0 || saving}
-        >
-          {saving ? <span className="spinner"></span> : <><Save size={18} /> Save Changes</>}
-        </button>
+        <div className="flex gap-4">
+          {edits.length > 0 && (
+            <button 
+              onClick={() => setEdits([])} 
+              className="btn"
+              style={{ borderColor: 'var(--accent-red)', color: 'var(--accent-red)', background: 'transparent' }}
+              disabled={saving}
+            >
+              <X size={18} /> Discard Changes
+            </button>
+          )}
+          <button 
+            onClick={handleSave} 
+            className="btn btn-primary"
+            disabled={edits.length === 0 || saving}
+          >
+            {saving ? <span className="spinner"></span> : <><Save size={18} /> Save Changes</>}
+          </button>
+        </div>
       </div>
 
       {data.length > 0 ? (

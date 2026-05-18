@@ -124,3 +124,4 @@ Based on the required reporting rules, the application alters the raw data mathe
 - Updated Top Sheet and PDF export calculations to compute total aggregate values by summing individual pre-rounded numbers, guaranteeing that the itemized columns visually map to the exact grand total without floating point discrepancies.
 - Added multi-row paste support in the Grouping Pairs tables, allowing users to copy multiple column values (e.g. from Excel) and paste them simultaneously across multiple rows.
 - Added multi-row selection and editing: Users can now click and drag, shift-click, or Cmd/Ctrl-click to select multiple cells in the same column. Typing in any of the selected cells will automatically synchronize the edits across all highlighted rows.
+- Added a "Discard Changes" button that appears alongside the "Save Changes" button, giving users a quick way to revert all unsaved table modifications at once.

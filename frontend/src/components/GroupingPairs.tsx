@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Save, ChevronDown, ChevronRight, ChevronUp } from 'lucide-react';
+import { Save, X } from 'lucide-react';
 
 import CollapsibleTable from './CollapsibleTable';
 
@@ -67,13 +67,25 @@ export default function GroupingPairs({ sessionId, edits, setEdits, onUpdate }: 
           <h2>Generated Grouping Pairs</h2>
           <p className="mb-0">Edit values below to update quantities. Click save to recalculate totals.</p>
         </div>
-        <button 
-          onClick={handleSave} 
-          className="btn btn-primary"
-          disabled={edits.length === 0 || saving}
-        >
-          {saving ? <span className="spinner"></span> : <><Save size={18} /> Save Changes</>}
-        </button>
+        <div className="flex gap-4">
+          {edits.length > 0 && (
+            <button 
+              onClick={() => setEdits([])} 
+              className="btn"
+              style={{ borderColor: 'var(--accent-red)', color: 'var(--accent-red)', background: 'transparent' }}
+              disabled={saving}
+            >
+              <X size={18} /> Discard Changes
+            </button>
+          )}
+          <button 
+            onClick={handleSave} 
+            className="btn btn-primary"
+            disabled={edits.length === 0 || saving}
+          >
+            {saving ? <span className="spinner"></span> : <><Save size={18} /> Save Changes</>}
+          </button>
+        </div>
       </div>
 
       {groupings.map((group: any) => (
