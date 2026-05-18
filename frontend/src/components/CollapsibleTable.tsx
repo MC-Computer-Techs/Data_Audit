@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ChevronDown, ChevronRight, ChevronUp } from 'lucide-react';
 
 interface CollapsibleTableProps {
@@ -13,6 +13,16 @@ interface CollapsibleTableProps {
 const CollapsibleTable = ({ title, data, columns, edits, handleCellChange, defaultIncluded = true }: CollapsibleTableProps) => {
   const [isOpen, setIsOpen] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'ascending' | 'descending' } | null>(null);
+  
+  const [selectedCells, setSelectedCells] = useState<Set<string>>(new Set());
+  const [dragStartCell, setDragStartCell] = useState<{ rowIndex: number; col: string } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    const handleGlobalMouseUp = () => setIsDragging(false);
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp);
+  }, []);
   
   if (!data || data.length === 0) return null;
 
@@ -122,12 +132,95 @@ const CollapsibleTable = ({ title, data, columns, edits, handleCellChange, defau
                       const displayValue = edit ? edit.value : row[col];
 
                       if (isEditable) {
+                        const cellId = `${row._raw_id}-${col}`;
+                        const isSelected = selectedCells.has(cellId);
+
                         return (
-                          <td key={col} className="editable-cell">
+                          <td 
+                            key={col} 
+                            className="editable-cell"
+                            onMouseDown={(e) => {
+                              if (e.button !== 0) return;
+                              if (e.shiftKey && dragStartCell && dragStartCell.col === col) {
+                                const start = Math.min(dragStartCell.rowIndex, i);
+                                const end = Math.max(dragStartCell.rowIndex, i);
+                                const newSelected = new Set<string>();
+                                for (let idx = start; idx <= end; idx++) {
+                                  if (sortedData[idx]) newSelected.add(`${sortedData[idx]._raw_id}-${col}`);
+                                }
+                                setSelectedCells(newSelected);
+                              } else if (e.metaKey || e.ctrlKey) {
+                                const newSelected = new Set(selectedCells);
+                                if (newSelected.has(cellId)) newSelected.delete(cellId);
+                                else newSelected.add(cellId);
+                                setSelectedCells(newSelected);
+                                setDragStartCell({ rowIndex: i, col });
+                              } else {
+                                setSelectedCells(new Set([cellId]));
+                                setDragStartCell({ rowIndex: i, col });
+                                setIsDragging(true);
+                              }
+                            }}
+                            onMouseEnter={() => {
+                              if (isDragging && dragStartCell && dragStartCell.col === col) {
+                                const start = Math.min(dragStartCell.rowIndex, i);
+                                const end = Math.max(dragStartCell.rowIndex, i);
+                                const newSelected = new Set<string>();
+                                for (let idx = start; idx <= end; idx++) {
+                                  if (sortedData[idx]) newSelected.add(`${sortedData[idx]._raw_id}-${col}`);
+                                }
+                                setSelectedCells(newSelected);
+                              }
+                            }}
+                          >
                             <input 
                               type="text" 
                               value={displayValue || ''} 
-                              onChange={(e) => handleCellChange(row._raw_id, col, e.target.value)}
+                              style={{ 
+                                backgroundColor: isSelected ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
+                                outline: isSelected ? '1px solid #3b82f6' : 'none'
+                              }}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                if (selectedCells.has(cellId) && selectedCells.size > 1) {
+                                  selectedCells.forEach(id => {
+                                    const [idRaw, idCol] = id.split('-');
+                                    handleCellChange(Number(idRaw), idCol, val);
+                                  });
+                                } else {
+                                  handleCellChange(row._raw_id, col, val);
+                                }
+                              }}
+                              onPaste={(e) => {
+                                const pasteData = e.clipboardData.getData('text');
+                                if (!pasteData) return;
+                                
+                                const pastedRows = pasteData.split(/\r\n|\n|\r/);
+                                if (pastedRows.length > 0 && pastedRows[pastedRows.length - 1] === '') {
+                                  pastedRows.pop();
+                                }
+                                
+                                if (pastedRows.length === 1 && selectedCells.has(cellId) && selectedCells.size > 1) {
+                                  e.preventDefault();
+                                  selectedCells.forEach(id => {
+                                    const [idRaw, idCol] = id.split('-');
+                                    handleCellChange(Number(idRaw), idCol, pastedRows[0]);
+                                  });
+                                  return;
+                                }
+
+                                if (pastedRows.length <= 1) return;
+                                
+                                e.preventDefault();
+                                
+                                pastedRows.forEach((val, idx) => {
+                                  const targetRowIndex = i + idx;
+                                  if (targetRowIndex < sortedData.length) {
+                                    const targetRow = sortedData[targetRowIndex];
+                                    handleCellChange(targetRow._raw_id, col, val);
+                                  }
+                                });
+                              }}
                             />
                           </td>
                         );
