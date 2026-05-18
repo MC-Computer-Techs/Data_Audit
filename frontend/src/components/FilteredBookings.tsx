@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Save } from 'lucide-react';
+import CollapsibleTable from './CollapsibleTable';
 
 interface FilteredBookingsProps {
   sessionId: string;
@@ -58,6 +59,10 @@ export default function FilteredBookings({ sessionId, edits, setEdits }: Filtere
 
   if (loading) return <div className="text-center mt-8"><span className="spinner"></span></div>;
 
+  const misformattedData = data.filter(row => row['Filter Reason'] && String(row['Filter Reason']).includes('Room 000'));
+
+  const columns = data.length > 0 ? Object.keys(data[0]) : [];
+
   return (
     <div className="glass-panel">
       <div className="flex justify-between items-center mb-6">
@@ -78,38 +83,27 @@ export default function FilteredBookings({ sessionId, edits, setEdits }: Filtere
       </div>
 
       {data.length > 0 ? (
-        <div className="table-container" style={{ maxHeight: '600px', overflowY: 'auto' }}>
-          <table>
-            <thead>
-              <tr>
-                <th style={{ width: '80px' }}>Include</th>
-                {Object.keys(data[0]).map(col => <th key={col}>{col}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((row: any, i: number) => {
-                const filterEdit = edits.find((e: any) => e.raw_id === row._raw_id && e.column === 'Manual Override Filtered');
-                // By default in FilteredBookings, row is NOT included (Filtered Out = True)
-                const isIncluded = filterEdit ? !filterEdit.value : false;
-
-                return (
-                <tr key={row._raw_id || i} style={{ backgroundColor: row['Filtered Out'] ? 'rgba(239, 68, 68, 0.1)' : 'transparent' }}>
-                  <td className="text-center">
-                    <input 
-                      type="checkbox" 
-                      checked={isIncluded} 
-                      onChange={(e) => handleCellChange(row._raw_id, 'Manual Override Filtered', !e.target.checked)} 
-                      style={{ cursor: 'pointer', transform: 'scale(1.2)' }}
-                    />
-                  </td>
-                  {Object.keys(row).map(col => (
-                    <td key={col}>{row[col] !== null ? String(row[col]) : ''}</td>
-                  ))}
-                </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
+          {misformattedData.length > 0 && (
+            <CollapsibleTable 
+              title="Misformatted Rooms" 
+              data={misformattedData} 
+              columns={columns} 
+              edits={edits} 
+              handleCellChange={handleCellChange} 
+              defaultIncluded={false} 
+            />
+          )}
+          {data.length > 0 && (
+            <CollapsibleTable 
+              title="Filtered Bookings" 
+              data={data} 
+              columns={columns} 
+              edits={edits} 
+              handleCellChange={handleCellChange} 
+              defaultIncluded={false} 
+            />
+          )}
         </div>
       ) : (
         <p>No filtered bookings found.</p>

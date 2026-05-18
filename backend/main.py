@@ -107,6 +107,13 @@ async def upload_files(
         other_schools_path = os.path.join(other_dir, "Other_Schools.csv")
         other_schools_df.to_csv(other_schools_path, index=False)
 
+        raw_df = processed_df['raw_annotated']
+        if 'Filter Reason' in raw_df.columns:
+            misformatted_df = raw_df[raw_df['Filter Reason'].astype(str).str.contains('Room 000', na=False)]
+            if not misformatted_df.empty:
+                misformatted_path = os.path.join(other_dir, "Misformatted.csv")
+                misformatted_df.to_csv(misformatted_path, index=False)
+
         ts_path = os.path.join(base_dir, f"Top_Sheet_{s_date.strftime('%Y-%m-%d')}_to_{e_date.strftime('%Y-%m-%d')}.csv")
         top_sheet_df.to_csv(ts_path, index=False, header=False)
         
