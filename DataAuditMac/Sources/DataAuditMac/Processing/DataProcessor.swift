@@ -332,5 +332,83 @@ struct DataProcessor {
         
         return (overall, roomsSplit, deptsSchools, raw, sems)
     }
+    
+    static func applyEdits(edits: [(id: Int, column: String, value: String)], to raw: inout [Reservation]) {
+        for edit in edits {
+            if let idx = raw.firstIndex(where: { $0.id == edit.id }) {
+                var mappedCol = edit.column
+                if mappedCol == "Clean Department" { mappedCol = "Department" }
+                else if mappedCol == "Clean Room" { mappedCol = "Room(s)" }
+                else if mappedCol == "Clean School" { continue } // Derived from Dept
+                
+                raw[idx].rawData[mappedCol] = edit.value
+            }
+        }
+    }
+    
+    static func generateOneSheet(pack: (overall: [Reservation], rooms: [Reservation], deptsSchools: [Reservation], raw: [Reservation], semesters: [String]), historicCSVRows: [[String]], startDate: Date) -> [[String]] {
+        let df_overall = pack.overall
+        let df_rooms = pack.rooms
+        let df_deptsSchools = pack.deptsSchools
+        
+        let cal = Calendar.current
+        let year = cal.component(.year, from: startDate)
+        let month = cal.component(.month, from: startDate)
+        let ayStartYear = month >= 9 ? year : year - 1
+        
+        let ayCode = "AY\(String(ayStartYear + 1).suffix(2))"
+        let prevAyCode = "AY\(String(ayStartYear).suffix(2))"
+        
+        var outputLines = [[String]]()
+        
+        for line in historicCSVRows {
+            outputLines.append(line)
+            
+            if line.count > 1 && line[1].trimmingCharacters(in: .whitespaces) == prevAyCode {
+                let entity = line.count > 2 ? line[2].trimmingCharacters(in: .whitespaces) : ""
+                
+                var catCol = ""
+                if entity == "All of Media Commons" { catCol = "Overall" }
+                else if ["ALT", "ALT ", "IDM", "ITP / IMA / Low Res", "CDI / Recorded Music", "Music Tech", "MARL", "Game Center", "Community Partner", "Other Group(s)"].contains(entity) { catCol = "Clean Department" }
+                else if ["Tandon", "Tisch", "Steinhardt", "Other School"].contains(entity) { catCol = "Clean School" }
+                else { catCol = "Clean Room" }
+                
+                var resCount = 0
+                var hsCount = 0.0
+                
+                if catCol == "Overall" {
+                    resCount = df_overall.count
+                    hsCount = df_overall.reduce(0.0) { $0 + $1.calcHours }
+                } else if catCol == "Clean Department" {
+                    let searchEntity = (entity == "ALT" || entity == "ALT ") ? "ALT (Ed Leadership, ECT, and Higher and Post Secondary Education)" : entity
+                    let subset = df_deptsSchools.filter { $0.rawData["Clean Department"] == searchEntity }
+                    resCount = subset.count
+                    hsCount = subset.reduce(0.0) { $0 + $1.calcHours }
+                } else if catCol == "Clean School" {
+                    let searchEntity = entity == "Other School" ? "Other Schools" : entity
+                    let subset = df_deptsSchools.filter { $0.rawData["Clean School"] == searchEntity }
+                    resCount = subset.count
+                    hsCount = subset.reduce(0.0) { $0 + $1.calcHours }
+                } else {
+                    let subset = df_rooms.filter { $0.rawData["Clean Room"] == entity.trimmingCharacters(in: .whitespaces) }
+                    resCount = subset.count
+                    hsCount = subset.reduce(0.0) { $0 + $1.calcHours }
+                }
+                
+                let prevResStr = line.count > 3 ? line[3].replacingOccurrences(of: ",", with: "") : "0"
+                let prevRes = Double(prevResStr) ?? 0.0
+                
+                var pctStr = ""
+                if prevRes > 0 {
+                    let pctChange = ((Double(resCount) - prevRes) / prevRes) * 100
+                    pctStr = String(format: "%.2f%%", pctChange)
+                }
+                
+                var newRow = ["", ayCode, entity, "\(resCount)", String(format: "%.2f", hsCount), pctStr, "", "", ""]
+                while newRow.count < line.count { newRow.append("") }
+                outputLines.append(newRow)
+            }
+        }
+        return outputLines
+    }
 }
-
