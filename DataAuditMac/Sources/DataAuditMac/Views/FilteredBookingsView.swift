@@ -9,7 +9,7 @@ struct FilteredBookingsView: View {
     var body: some View {
         let filtered = pack.raw.filter { $0.filteredOut }
         let misformatted = filtered.filter { $0.filterReason.contains("Room 000") }
-        let columns = filtered.first.map { Array($0.rawData.keys).sorted() } ?? []
+        let columns = orderedColumns(for: filtered)
 
         VStack(alignment: .leading, spacing: 0) {
             // Header
@@ -85,5 +85,56 @@ struct FilteredBookingsView: View {
             }
         }
         .padding()
+    }
+
+    /// Canonical column order matching the exported CSV files
+    private static let baseColumnOrder: [String] = [
+        "Request #",
+        "Department",
+        "Role (Affiliation)",
+        "Room(s)",
+        "Booking Start Date",
+        "Booking End Date",
+        "Booking Start Time",
+        "Booking End Time",
+        "Time In Use, Hours",
+        "# rooms used",
+        "ACTUAL hours",
+        "Reservation Title",
+        "Reservation Description",
+        "Expected Attendance",
+        "Reservation Origin",
+        "Booking Type",
+        "Attendee Affiliation(s)",
+        "End Event Status",
+        "Room Setup Needed (Y/N)",
+        "Room Setup Details",
+        "Media Services (Y/N)",
+        "Media Service Details",
+        "Catering (Y/N)",
+        "Hire Security (Y/N)",
+        "_raw_id",
+        "Filtered Out",
+        "Filter Reason",
+        "Semester",
+        "Calc Hours",
+        "All Depts",
+        "Clean Department",
+        "Clean School",
+        "Clean Room"
+    ]
+
+    private func orderedColumns(for data: [Reservation]) -> [String] {
+        guard let first = data.first else { return [] }
+        let available = Set(first.rawData.keys)
+
+        // Start with columns in canonical order that exist in the data
+        var result = Self.baseColumnOrder.filter { available.contains($0) }
+
+        // Append any remaining columns not yet included (alphabetically)
+        let remaining = available.subtracting(Set(result)).sorted()
+        result.append(contentsOf: remaining)
+
+        return result
     }
 }

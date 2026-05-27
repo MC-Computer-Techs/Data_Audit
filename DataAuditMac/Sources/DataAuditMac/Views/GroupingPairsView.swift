@@ -70,7 +70,7 @@ struct GroupingPairsView: View {
             CollapsibleTableView(
                 title: "Schools",
                 data: schoolsData,
-                columns: columnsFrom(schoolsData),
+                columns: orderedColumns(for: schoolsData, type: .schools),
                 edits: $edits,
                 defaultIncluded: true
             )
@@ -78,7 +78,7 @@ struct GroupingPairsView: View {
             CollapsibleTableView(
                 title: "Departments",
                 data: deptsData,
-                columns: columnsFrom(deptsData),
+                columns: orderedColumns(for: deptsData, type: .departments),
                 edits: $edits,
                 defaultIncluded: true
             )
@@ -86,16 +86,99 @@ struct GroupingPairsView: View {
             CollapsibleTableView(
                 title: "Rooms",
                 data: roomsData,
-                columns: columnsFrom(roomsData),
+                columns: orderedColumns(for: roomsData, type: .rooms),
                 edits: $edits,
                 defaultIncluded: true
             )
         }
     }
 
-    private func columnsFrom(_ data: [Reservation]) -> [String] {
+    private enum TableType {
+        case schools
+        case departments
+        case rooms
+    }
+
+    /// Canonical column order matching the exported CSV files
+    private static let baseColumnOrder: [String] = [
+        "Request #",
+        "Department",
+        "Role (Affiliation)",
+        "Room(s)",
+        "Booking Start Date",
+        "Booking End Date",
+        "Booking Start Time",
+        "Booking End Time",
+        "Time In Use, Hours",
+        "# rooms used",
+        "ACTUAL hours",
+        "Reservation Title",
+        "Reservation Description",
+        "Expected Attendance",
+        "Reservation Origin",
+        "Booking Type",
+        "Attendee Affiliation(s)",
+        "End Event Status",
+        "Room Setup Needed (Y/N)",
+        "Room Setup Details",
+        "Media Services (Y/N)",
+        "Media Service Details",
+        "Catering (Y/N)",
+        "Hire Security (Y/N)",
+        "_raw_id",
+        "Filtered Out",
+        "Filter Reason",
+        "Semester",
+        "Calc Hours"
+    ]
+
+    private static let deptsSchoolsTrailingColumns = ["All Depts", "Clean Department", "Clean School"]
+    private static let roomsTrailingColumns = ["Clean Room"]
+
+    private func orderedColumns(for data: [Reservation], type: TableType) -> [String] {
         guard let first = data.first else { return [] }
-        return first.rawData.keys.sorted()
+        let available = Set(first.rawData.keys)
+
+        let trailing: [String]
+        let priorityColumn: String?
+        
+        switch type {
+        case .schools:
+            trailing = Self.deptsSchoolsTrailingColumns
+            priorityColumn = "Clean School"
+        case .departments:
+            trailing = Self.deptsSchoolsTrailingColumns
+            priorityColumn = "Clean Department"
+        case .rooms:
+            trailing = Self.roomsTrailingColumns
+            priorityColumn = "Clean Room"
+        }
+
+        // Start with columns in canonical order that exist in the data
+        var result = Self.baseColumnOrder.filter { available.contains($0) }
+
+        // Add trailing type-specific columns
+        for col in trailing {
+            if available.contains(col) && !result.contains(col) {
+                result.append(col)
+            }
+        }
+        
+        // Move the priority column immediately after 'Request #'
+        if let pCol = priorityColumn, result.contains(pCol) {
+            result.removeAll(where: { $0 == pCol })
+            if let reqIndex = result.firstIndex(of: "Request #") {
+                result.insert(pCol, at: reqIndex + 1)
+            } else {
+                result.insert(pCol, at: 0)
+            }
+        }
+
+        // Append any remaining columns not yet included (alphabetically)
+        let remaining = available.subtracting(Set(result)).sorted()
+        result.append(contentsOf: remaining)
+
+        return result
     }
 
     private func getSemesterCode(_ sem: String) -> String {

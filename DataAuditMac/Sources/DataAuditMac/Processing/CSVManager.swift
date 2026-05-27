@@ -36,20 +36,53 @@ struct CSVManager {
     static func exportCSV(reservations: [Reservation], to url: URL) throws {
         guard !reservations.isEmpty else { return }
         
-        // Find all unique keys to form the header
+        // Canonical column order matching the web app's CSV exports
+        let canonicalOrder: [String] = [
+            "Request #",
+            "Department",
+            "Role (Affiliation)",
+            "Room(s)",
+            "Booking Start Date",
+            "Booking End Date",
+            "Booking Start Time",
+            "Booking End Time",
+            "Time In Use, Hours",
+            "# rooms used",
+            "ACTUAL hours",
+            "Reservation Title",
+            "Reservation Description",
+            "Expected Attendance",
+            "Reservation Origin",
+            "Booking Type",
+            "Attendee Affiliation(s)",
+            "End Event Status",
+            "Room Setup Needed (Y/N)",
+            "Room Setup Details",
+            "Media Services (Y/N)",
+            "Media Service Details",
+            "Catering (Y/N)",
+            "Hire Security (Y/N)",
+            "_raw_id",
+            "Filtered Out",
+            "Filter Reason",
+            "Semester",
+            "Calc Hours",
+            "All Depts",
+            "Clean Department",
+            "Clean School",
+            "Clean Room"
+        ]
+        
+        // Find all unique keys across the data
         var headerSet = Set<String>()
         for res in reservations {
             headerSet.formUnion(res.rawData.keys)
         }
-        var headers = Array(headerSet).sorted()
         
-        // Ensure _raw_id is first if not in rawData
-        if !headers.contains("_raw_id") {
-            headers.insert("_raw_id", at: 0)
-        } else {
-            headers.removeAll { $0 == "_raw_id" }
-            headers.insert("_raw_id", at: 0)
-        }
+        // Build header: canonical columns first, then any extras alphabetically
+        var headers = canonicalOrder.filter { headerSet.contains($0) }
+        let remaining = headerSet.subtracting(Set(headers)).sorted()
+        headers.append(contentsOf: remaining)
         
         var csvString = headers.map { escapeCSV($0) }.joined(separator: ",") + "\n"
         
