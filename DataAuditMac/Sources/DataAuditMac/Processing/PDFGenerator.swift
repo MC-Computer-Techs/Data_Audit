@@ -10,11 +10,12 @@ struct PDFGenerator {
                 .font(.largeTitle)
                 .bold()
                 .padding()
-            TopSheetView(pack: pack)
-                .frame(width: 800, height: 1000)
+            TopSheetView(pack: pack, isExporting: true)
+                .frame(width: 800)
         }
         .padding()
         .background(Color.white)
+        .fixedSize(horizontal: false, vertical: true)
         
         let renderer = ImageRenderer(content: pdfView)
         

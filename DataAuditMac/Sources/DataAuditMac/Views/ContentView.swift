@@ -21,8 +21,12 @@ struct ContentView: View {
     @State private var historicOneSheetRows: [[String]]? = nil
     @State private var oneSheetUpdatedRows: [[String]]? = nil
 
+    @State private var selectedAcademicYear: String = "2024-2025"
+    private let academicYears = ["2022-2023", "2023-2024", "2024-2025", "2025-2026", "2026-2027", "2027-2028"]
+
     @State private var pendingEdits: [PendingEdit] = []
 
+    @State private var isImportedBundle = false
     @State private var isProcessing = false
     @State private var errorMessage: String? = nil
     @State private var successMessage: String? = nil
@@ -57,17 +61,49 @@ struct ContentView: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 600)
 
-            // Date pickers
+            // Date pickers and Academic Year selection
             HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Academic Year").font(.caption).foregroundColor(.secondary)
+                    Picker("", selection: $selectedAcademicYear) {
+                        ForEach(academicYears, id: \.self) { year in
+                            Text(year).tag(year)
+                        }
+                        Text("Custom").tag("Custom")
+                    }
+                    .labelsHidden()
+                    .frame(width: 120)
+                    .onChange(of: selectedAcademicYear) { newValue in
+                        if newValue != "Custom" {
+                            let parts = newValue.split(separator: "-")
+                            if parts.count == 2, let startYear = Int(parts[0]), let endYear = Int(parts[1]) {
+                                var startComps = DateComponents()
+                                startComps.year = startYear; startComps.month = 9; startComps.day = 1
+                                if let newStart = Calendar.current.date(from: startComps) {
+                                    startDate = newStart
+                                }
+                                
+                                var endComps = DateComponents()
+                                endComps.year = endYear; endComps.month = 8; endComps.day = 31
+                                if let newEnd = Calendar.current.date(from: endComps) {
+                                    endDate = newEnd
+                                }
+                            }
+                        }
+                    }
+                }
+                
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Start Date").font(.caption).foregroundColor(.secondary)
                     DatePicker("", selection: $startDate, displayedComponents: .date)
                         .labelsHidden()
+                        .onChange(of: startDate) { _ in updateAcademicYearToCustomIfNeeded() }
                 }
                 VStack(alignment: .leading, spacing: 4) {
                     Text("End Date").font(.caption).foregroundColor(.secondary)
                     DatePicker("", selection: $endDate, displayedComponents: .date)
                         .labelsHidden()
+                        .onChange(of: endDate) { _ in updateAcademicYearToCustomIfNeeded() }
                 }
             }
 
@@ -86,8 +122,14 @@ struct ContentView: View {
                     fileTypes: [UTType.commaSeparatedText],
                     onSelect: { url in oneSheetURL = url }
                 )
+                
+                FolderDropZone(
+                    icon: "folder",
+                    label: "Import Exported Bundle",
+                    onSelect: { url in importBundle(from: url) }
+                )
             }
-            .frame(maxWidth: 700)
+            .frame(maxWidth: 800)
 
             if let error = errorMessage {
                 HStack(spacing: 6) {
@@ -151,6 +193,7 @@ struct ContentView: View {
                     }
                 }
                 .buttonStyle(.bordered)
+                
                 Spacer()
                 if isProcessing {
                     ProgressView()
@@ -212,6 +255,53 @@ struct ContentView: View {
         successMessage = nil
         errorMessage = nil
         csvFileURL = nil
+        isImportedBundle = false
+    }
+
+    private func updateAcademicYearToCustomIfNeeded() {
+        let cal = Calendar.current
+        let startYear = cal.component(.year, from: startDate)
+        let endYear = cal.component(.year, from: endDate)
+        let startMonth = cal.component(.month, from: startDate)
+        let startDay = cal.component(.day, from: startDate)
+        let endMonth = cal.component(.month, from: endDate)
+        let endDay = cal.component(.day, from: endDate)
+        
+        let expectedYearString = "\(startYear)-\(endYear)"
+        if startMonth == 9 && startDay == 1 && endMonth == 8 && endDay == 31 && endYear == startYear + 1 && academicYears.contains(expectedYearString) {
+            if selectedAcademicYear != expectedYearString {
+                selectedAcademicYear = expectedYearString
+            }
+        } else {
+            if selectedAcademicYear != "Custom" {
+                selectedAcademicYear = "Custom"
+            }
+        }
+    }
+
+    private func importBundle(from url: URL) {
+        isProcessing = true
+        errorMessage = nil
+        successMessage = nil
+        
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                let result = try CSVManager.importBundle(from: url)
+                DispatchQueue.main.async {
+                    self.rawReservations = result.pack.raw
+                    self.processedPack = result.pack
+                    self.oneSheetUpdatedRows = result.oneSheetRows
+                    self.isImportedBundle = true
+                    self.isProcessing = false
+                    self.successMessage = "Bundle imported successfully. You can now make edits and re-export."
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.errorMessage = "Failed to import bundle: \(error.localizedDescription)"
+                    self.isProcessing = false
+                }
+            }
+        }
     }
 
     private func processData() {
@@ -372,6 +462,55 @@ struct FileDropZone: View {
     private func selectFile() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = fileTypes
+        panel.allowsMultipleSelection = false
+        if panel.runModal() == .OK, let url = panel.url {
+            onSelect(url)
+        }
+    }
+}
+
+// MARK: - FolderDropZone
+
+struct FolderDropZone: View {
+    let icon: String
+    let label: String
+    let onSelect: (URL) -> Void
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: selectFolder) {
+            VStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 28))
+                    .foregroundColor(.secondary)
+                Text(label)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+            }
+            .frame(maxWidth: .infinity, minHeight: 100)
+            .padding()
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(
+                        style: StrokeStyle(lineWidth: 1, dash: [6])
+                    )
+                    .foregroundColor(isHovering ? .orange : .secondary.opacity(0.5))
+            )
+            .background(
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(isHovering ? Color.orange.opacity(0.03) : Color.clear)
+            )
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in isHovering = hovering }
+    }
+
+    private func selectFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
         if panel.runModal() == .OK, let url = panel.url {
             onSelect(url)

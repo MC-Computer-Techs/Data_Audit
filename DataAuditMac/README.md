@@ -4,7 +4,7 @@ Native macOS version of the Data Audit application, built with Swift and SwiftUI
 
 ## Features
 
-- **Visual Upload Screen**: Drag-and-drop file zones for the Booking Tool CSV and optional Historic One Sheet CSV, matching the web app's 3-column file upload layout with date pickers defaulting to `2024-09-01` / `2025-08-31`.
+- **Visual Upload Screen**: Drag-and-drop file zones for the Booking Tool CSV and optional Historic One Sheet CSV. Includes Start/End Date pickers along with an **Academic Year** drop-down picker to easily set standard start/end date ranges.
 - **Top Sheet Overview**: Metric cards (Total Reservations, Total Hours) with hover animations, followed by a structured data table with section title highlighting and semester column headers — matching the web app's styled HTML table.
 - **Grouping Pairs**: Full collapsible data tables for Schools, Departments, and Rooms per semester. Shows **every column** from the data (not just editable fields). Supports column sorting (click headers), per-row "Include" checkbox, inline cell editing, multi-cell selection, and multi-row paste.
 - **One Sheet Update**: Full scrollable table with purple AY row highlighting. "Download CSV" button for direct one-sheet export.
@@ -12,7 +12,7 @@ Native macOS version of the Data Audit application, built with Swift and SwiftUI
 - **Batched Edit Pipeline**: Edits are collected as pending changes (highlighted in yellow). "Save Changes" applies all at once and triggers recalculation. "Discard Changes" clears pending edits. Matches the web app's batch-save behavior exactly.
 - **Auto-Export**: On initial upload, automatically saves the full export bundle to `~/Documents/` matching the Python app's auto-save behavior. Manual "Export Bundle" button also available.
 - **Bundle Exporter**: Creates the date-labeled folder (`YYYY-MM-DD_to_YYYY-MM-DD_Data_Audit/`) with `Grouping_Pairs/` and `Other/` subfolders, Top Sheet CSV, Misformatted CSV, Other Schools CSV, and updated One Sheet CSV.
-- **PDF Export**: Renders the Top Sheet as a high-quality PDF via native `ImageRenderer`.
+- **PDF Export**: Renders the Top Sheet as a high-quality PDF via native `ImageRenderer`. Fixed layout rendering perfectly matches the HTML structure but removes all scrolling constraints for a clean full-page render.
 
 ## How to Run
 

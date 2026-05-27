@@ -4,10 +4,22 @@ import UniformTypeIdentifiers
 struct TopSheetView: View {
     let pack: (overall: [Reservation], rooms: [Reservation], deptsSchools: [Reservation], raw: [Reservation], semesters: [String])
 
+    var isExporting: Bool = false
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                // Header with download buttons
+        if isExporting {
+            content
+        } else {
+            ScrollView {
+                content
+            }
+        }
+    }
+
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            // Header with download buttons
+            if !isExporting {
                 HStack {
                     Text("Top Sheet Overview")
                         .font(.title2.weight(.semibold))
@@ -20,24 +32,24 @@ struct TopSheetView: View {
                     }
                     .buttonStyle(.bordered)
                 }
-
-                // Metric cards
-                HStack(spacing: 16) {
-                    MetricCard(
-                        label: "Total Reservations",
-                        value: "\(pack.overall.count)"
-                    )
-                    MetricCard(
-                        label: "Total Hours",
-                        value: String(format: "%.2f", pack.overall.reduce(0) { $0 + $1.calcHours })
-                    )
-                }
-
-                // Top Sheet Table
-                topSheetTable
             }
-            .padding()
+
+            // Metric cards
+            HStack(spacing: 16) {
+                MetricCard(
+                    label: "Total Reservations",
+                    value: "\(pack.overall.count)"
+                )
+                MetricCard(
+                    label: "Total Hours",
+                    value: String(format: "%.2f", pack.overall.reduce(0) { $0 + $1.calcHours })
+                )
+            }
+
+            // Top Sheet Table
+            topSheetTable
         }
+        .padding()
     }
 
     private var topSheetTable: some View {
@@ -55,23 +67,24 @@ struct TopSheetView: View {
                         .font(.system(size: 13, weight: (isHeaderRow || isSectionTitle) ? .bold : .regular))
                         .foregroundColor(isHeaderRow ? .white : .primary)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.leading, (isSectionTitle || isHeaderRow) ? 8 : 20)
-                        .padding(.vertical, 8)
+                        .padding(.leading, (isSectionTitle || isHeaderRow) ? 16 : 32)
+                        .padding(.vertical, 10)
 
                     // Semester columns + Total
                     ForEach(1..<row.cells.count, id: \.self) { j in
                         Text(row.cells[j])
                             .font(.system(size: 13, weight: isHeaderRow ? .bold : .regular))
                             .foregroundColor(isHeaderRow ? .white : .primary)
-                            .frame(width: 90, alignment: .trailing)
-                            .padding(.vertical, 8)
+                            .frame(width: 100, alignment: .trailing)
+                            .padding(.vertical, 10)
+                            .padding(.trailing, 16)
                     }
                 }
                 .background(
                     isHeaderRow
-                        ? Color.blue.opacity(0.8)
+                        ? Color.indigo
                         : isSectionTitle
-                            ? Color(nsColor: .controlBackgroundColor)
+                            ? Color.blue.opacity(0.1)
                             : Color.clear
                 )
 

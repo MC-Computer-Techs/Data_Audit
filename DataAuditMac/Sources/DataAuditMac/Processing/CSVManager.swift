@@ -215,4 +215,113 @@ struct CSVManager {
         }
         return csvStr
     }
+    
+    // MARK: - Bundle Import
+    
+    static func importBundle(from directoryURL: URL) throws -> (pack: (overall: [Reservation], rooms: [Reservation], deptsSchools: [Reservation], raw: [Reservation], semesters: [String]), oneSheetRows: [[String]]?) {
+        let fm = FileManager.default
+        
+        // 1. Grouping Pairs
+        let groupingDir = directoryURL.appendingPathComponent("Grouping_Pairs")
+        var deptsSchools = [Reservation]()
+        var rooms = [Reservation]()
+        
+        if let groupingFiles = try? fm.contentsOfDirectory(at: groupingDir, includingPropertiesForKeys: nil) {
+            for file in groupingFiles where file.pathExtension == "csv" {
+                let name = file.lastPathComponent
+                let rows = try importReservations(from: file)
+                if name.contains("_Schools") || name.contains("_Dpmts") {
+                    deptsSchools.append(contentsOf: rows)
+                } else if name.contains("_Rooms") {
+                    rooms.append(contentsOf: rows)
+                }
+            }
+        }
+        
+        // 2. Other Directory
+        let otherDir = directoryURL.appendingPathComponent("Other")
+        var raw = [Reservation]()
+        if let otherFiles = try? fm.contentsOfDirectory(at: otherDir, includingPropertiesForKeys: nil) {
+            for file in otherFiles where file.pathExtension == "csv" {
+                let name = file.lastPathComponent
+                let rows = try importReservations(from: file)
+                if name == "Other_Schools.csv" {
+                    deptsSchools.append(contentsOf: rows)
+                } else if name == "Misformatted.csv" {
+                    raw.append(contentsOf: rows)
+                }
+            }
+        }
+        
+        // Ensure no duplicates in deptsSchools if they were in both _Schools and _Dpmts
+        var uniqueDeptsSchools = [Reservation]()
+        var seenDepts = Set<String>()
+        for res in deptsSchools {
+            // Uniqueness is defined by id + Clean Department for deptsSchools
+            let key = "\(res.id)_\(res.rawData["Clean Department"] ?? "")"
+            if !seenDepts.contains(key) {
+                seenDepts.insert(key)
+                uniqueDeptsSchools.append(res)
+            }
+        }
+        deptsSchools = uniqueDeptsSchools
+        
+        // Ensure no duplicates in rooms
+        var uniqueRooms = [Reservation]()
+        var seenRooms = Set<String>()
+        for res in rooms {
+            let key = "\(res.id)_\(res.rawData["Clean Room"] ?? "")"
+            if !seenRooms.contains(key) {
+                seenRooms.insert(key)
+                uniqueRooms.append(res)
+            }
+        }
+        rooms = uniqueRooms
+        
+        // 3. Reconstruct `overall` by taking unique IDs from deptsSchools
+        var overall = [Reservation]()
+        var seenIds = Set<Int>()
+        for res in deptsSchools {
+            if !seenIds.contains(res.id) {
+                seenIds.insert(res.id)
+                overall.append(res)
+            }
+        }
+        
+        // Also add valid items back to raw (which currently only has Misformatted)
+        raw.append(contentsOf: overall)
+        
+        // Recalculate derived properties for reconstructed items since importReservations leaves them as defaults
+        for i in 0..<overall.count {
+            overall[i].semester = DataProcessor.getSemester(date: overall[i].bookingStartDate)
+            overall[i].calcHours = DataProcessor.calcCappedHours(res: overall[i])
+            overall[i].allDepts = DataProcessor.extractDepartments(deptStr: overall[i].department, title: overall[i].reservationTitle)
+        }
+        for i in 0..<rooms.count {
+            rooms[i].semester = DataProcessor.getSemester(date: rooms[i].bookingStartDate)
+            let totalRooms = max(1, rooms[i].numRoomsUsed)
+            rooms[i].calcHours = DataProcessor.calcCappedHours(res: rooms[i]) / Double(totalRooms)
+            rooms[i].allDepts = DataProcessor.extractDepartments(deptStr: rooms[i].department, title: rooms[i].reservationTitle)
+        }
+        for i in 0..<deptsSchools.count {
+            deptsSchools[i].semester = DataProcessor.getSemester(date: deptsSchools[i].bookingStartDate)
+            deptsSchools[i].calcHours = DataProcessor.calcCappedHours(res: deptsSchools[i])
+            deptsSchools[i].allDepts = DataProcessor.extractDepartments(deptStr: deptsSchools[i].department, title: deptsSchools[i].reservationTitle)
+        }
+        
+        // Semesters
+        let sems = Array(Set(overall.map { $0.semester })).filter { $0 != "Other" }.sorted()
+        
+        let pack = (overall: overall, rooms: rooms, deptsSchools: deptsSchools, raw: raw, semesters: sems)
+        
+        // 4. One Sheet
+        var oneSheetRows: [[String]]? = nil
+        if let bundleFiles = try? fm.contentsOfDirectory(at: directoryURL, includingPropertiesForKeys: nil) {
+            if let osFile = bundleFiles.first(where: { $0.lastPathComponent.starts(with: "One_Sheet_Updated") }) {
+                oneSheetRows = try? parseCSVRows(from: osFile)
+            }
+        }
+        
+        return (pack, oneSheetRows)
+    }
 }
