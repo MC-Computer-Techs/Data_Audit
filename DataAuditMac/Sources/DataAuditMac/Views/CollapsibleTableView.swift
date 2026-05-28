@@ -119,7 +119,7 @@ struct NativeTableWrapper: NSViewRepresentable {
     func updateNSView(_ nsView: NSScrollView, context: Context) {
         let c = context.coordinator
         let prevEditCount = c.currentEdits.count
-        let dataChanged = c.currentData.count != data.count
+        let dataChanged = c.currentData != data
         let searchChanged = c.currentSearchText != searchText
 
         c.currentData = data
@@ -314,7 +314,7 @@ struct NativeTableWrapper: NSViewRepresentable {
             handleCellChange(rawId: res.id, column: "Manual Override Filtered", value: newVal)
         }
 
-        func controlTextDidEndEditing(_ obj: Notification) {
+        func controlTextDidChange(_ obj: Notification) {
             guard let tf = obj.object as? NSTextField,
                   let tv = self.tableView else { return }
             let row = tv.row(for: tf)
@@ -341,15 +341,23 @@ struct NativeTableWrapper: NSViewRepresentable {
                     }
                 }
 
-                // Refresh to show updated highlights on all affected rows
+                // Highlight current cell
                 tf.drawsBackground = true
                 tf.backgroundColor = NSColor.systemOrange.withAlphaComponent(0.25)
 
-                // Reload other selected rows to update their cell backgrounds
+                // Highlight other selected rows in the same column by reloading them
                 if selectedRows.count > 1 {
-                    tv.reloadData(forRowIndexes: selectedRows, columnIndexes: IndexSet(integer: col))
+                    DispatchQueue.main.async {
+                        var rowsToReload = selectedRows
+                        rowsToReload.remove(row)
+                        tv.reloadData(forRowIndexes: rowsToReload, columnIndexes: IndexSet(integer: col))
+                    }
                 }
             }
+        }
+
+        func controlTextDidEndEditing(_ obj: Notification) {
+            // Handled dynamically in controlTextDidChange
         }
 
         func tableView(_ tableView: NSTableView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) {
