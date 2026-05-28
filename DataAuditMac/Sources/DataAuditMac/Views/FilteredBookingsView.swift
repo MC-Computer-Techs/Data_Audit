@@ -3,6 +3,7 @@ import SwiftUI
 struct FilteredBookingsView: View {
     let pack: (overall: [Reservation], rooms: [Reservation], deptsSchools: [Reservation], raw: [Reservation], semesters: [String])
     @Binding var edits: [PendingEdit]
+    let savedEdits: Set<String>
     let onSave: () -> Void
     let onDiscard: () -> Void
 
@@ -89,6 +90,7 @@ struct FilteredBookingsView: View {
                             data: noShows,
                             columns: columns,
                             edits: $edits,
+                            savedEdits: savedEdits,
                             defaultIncluded: false,
                             searchText: searchText
                         )
@@ -100,6 +102,7 @@ struct FilteredBookingsView: View {
                             data: lateCancellations,
                             columns: columns,
                             edits: $edits,
+                            savedEdits: savedEdits,
                             defaultIncluded: false,
                             searchText: searchText
                         )
@@ -111,6 +114,7 @@ struct FilteredBookingsView: View {
                             data: misformatted,
                             columns: columns,
                             edits: $edits,
+                            savedEdits: savedEdits,
                             defaultIncluded: false,
                             searchText: searchText
                         )
@@ -122,6 +126,7 @@ struct FilteredBookingsView: View {
                             data: otherFiltered,
                             columns: columns,
                             edits: $edits,
+                            savedEdits: savedEdits,
                             defaultIncluded: false,
                             searchText: searchText
                         )

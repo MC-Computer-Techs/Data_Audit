@@ -12,6 +12,7 @@ struct CollapsibleTableView: View {
     let data: [Reservation]
     let columns: [String]
     @Binding var edits: [PendingEdit]
+    var savedEdits: Set<String> = []
     let defaultIncluded: Bool
     var searchText: String = ""
 
@@ -46,6 +47,7 @@ struct CollapsibleTableView: View {
                     data: data,
                     columns: columns,
                     edits: $edits,
+                    savedEdits: savedEdits,
                     defaultIncluded: defaultIncluded,
                     searchText: searchText
                 )
@@ -63,6 +65,7 @@ struct NativeTableWrapper: NSViewRepresentable {
     let data: [Reservation]
     let columns: [String]
     @Binding var edits: [PendingEdit]
+    let savedEdits: Set<String>
     let defaultIncluded: Bool
     var searchText: String = ""
 
@@ -124,6 +127,7 @@ struct NativeTableWrapper: NSViewRepresentable {
 
         c.currentData = data
         c.currentEdits = edits
+        c.savedEdits = savedEdits
         c.defaultIncluded = defaultIncluded
         c.currentSearchText = searchText
 
@@ -155,6 +159,7 @@ struct NativeTableWrapper: NSViewRepresentable {
         var sortedData: [Reservation] = []
         var currentData: [Reservation] = []
         var currentEdits: [PendingEdit] = []
+        var savedEdits: Set<String> = []
         var columns: [String] = []
         var sortKey: String? = nil
         var sortAscending: Bool = true
@@ -295,7 +300,7 @@ struct NativeTableWrapper: NSViewRepresentable {
             cellView.textField?.delegate = self
 
             // Highlight edited cells with a more prominent orange background
-            if edit != nil {
+            if edit != nil || savedEdits.contains("\(res.id):\(colId)") {
                 cellView.textField?.drawsBackground = true
                 cellView.textField?.backgroundColor = NSColor.systemOrange.withAlphaComponent(0.25)
             } else {

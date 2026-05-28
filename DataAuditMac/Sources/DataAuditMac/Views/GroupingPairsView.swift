@@ -3,6 +3,7 @@ import SwiftUI
 struct GroupingPairsView: View {
     let pack: (overall: [Reservation], rooms: [Reservation], deptsSchools: [Reservation], raw: [Reservation], semesters: [String])
     @Binding var edits: [PendingEdit]
+    let savedEdits: Set<String>
     let onSave: () -> Void
     let onDiscard: () -> Void
 
@@ -91,6 +92,7 @@ struct GroupingPairsView: View {
                 data: schoolsData,
                 columns: orderedColumns(for: schoolsData, type: .schools),
                 edits: $edits,
+                savedEdits: savedEdits,
                 defaultIncluded: true,
                 searchText: searchText
             )
@@ -100,6 +102,7 @@ struct GroupingPairsView: View {
                 data: deptsData,
                 columns: orderedColumns(for: deptsData, type: .departments),
                 edits: $edits,
+                savedEdits: savedEdits,
                 defaultIncluded: true,
                 searchText: searchText
             )
@@ -109,6 +112,7 @@ struct GroupingPairsView: View {
                 data: roomsData,
                 columns: orderedColumns(for: roomsData, type: .rooms),
                 edits: $edits,
+                savedEdits: savedEdits,
                 defaultIncluded: true,
                 searchText: searchText
             )

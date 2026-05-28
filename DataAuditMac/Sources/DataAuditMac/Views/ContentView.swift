@@ -25,6 +25,7 @@ struct ContentView: View {
     private let academicYears = ["2022-2023", "2023-2024", "2024-2025", "2025-2026", "2026-2027", "2027-2028"]
 
     @State private var pendingEdits: [PendingEdit] = []
+    @State private var savedEdits: Set<String> = []
 
     @State private var isImportedBundle = false
     @State private var isProcessing = false
@@ -216,6 +217,7 @@ struct ContentView: View {
                 GroupingPairsView(
                     pack: processedPack!,
                     edits: $pendingEdits,
+                    savedEdits: savedEdits,
                     onSave: saveChanges,
                     onDiscard: discardChanges
                 )
@@ -233,6 +235,7 @@ struct ContentView: View {
                 FilteredBookingsView(
                     pack: processedPack!,
                     edits: $pendingEdits,
+                    savedEdits: savedEdits,
                     onSave: saveChanges,
                     onDiscard: discardChanges
                 )
@@ -252,6 +255,7 @@ struct ContentView: View {
         oneSheetUpdatedRows = nil
         historicOneSheetRows = nil
         pendingEdits = []
+        savedEdits = []
         successMessage = nil
         errorMessage = nil
         csvFileURL = nil
@@ -364,6 +368,11 @@ struct ContentView: View {
         // Apply all pending edits to rawReservations
         let editTuples = pendingEdits.map { (id: $0.rawId, column: $0.column, value: $0.value) }
         DataProcessor.applyEdits(edits: editTuples, to: &rawReservations)
+        
+        for edit in pendingEdits {
+            savedEdits.insert("\(edit.rawId):\(edit.column)")
+        }
+        
         pendingEdits = []
 
         // Recalculate
