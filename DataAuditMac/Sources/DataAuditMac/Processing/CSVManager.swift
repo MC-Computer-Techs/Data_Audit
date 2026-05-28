@@ -39,6 +39,7 @@ struct CSVManager {
         // Canonical column order matching the web app's CSV exports
         let canonicalOrder: [String] = [
             "Request #",
+            "Filter Reason",
             "Department",
             "Role (Affiliation)",
             "Room(s)",
@@ -64,7 +65,6 @@ struct CSVManager {
             "Hire Security (Y/N)",
             "_raw_id",
             "Filtered Out",
-            "Filter Reason",
             "Semester",
             "Calc Hours",
             "All Depts",

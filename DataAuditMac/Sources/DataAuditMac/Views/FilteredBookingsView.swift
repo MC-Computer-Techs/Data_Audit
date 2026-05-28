@@ -141,6 +141,7 @@ struct FilteredBookingsView: View {
     /// Canonical column order matching the exported CSV files
     private static let baseColumnOrder: [String] = [
         "Request #",
+        "Filter Reason",
         "Department",
         "Role (Affiliation)",
         "Room(s)",
@@ -166,7 +167,6 @@ struct FilteredBookingsView: View {
         "Hire Security (Y/N)",
         "_raw_id",
         "Filtered Out",
-        "Filter Reason",
         "Semester",
         "Calc Hours",
         "All Depts",
