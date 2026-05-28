@@ -330,6 +330,26 @@ struct DataProcessor {
         
         let sems = Array(Set(overall.map { $0.semester })).filter { $0 != "Other" }.sorted()
         
+        // Sync derived struct properties into rawData so exports contain all fields
+        func syncDerivedFields(_ res: inout Reservation) {
+            res.rawData["Calc Hours"] = String(format: "%.2f", res.calcHours)
+            res.rawData["Semester"] = res.semester
+            res.rawData["Filtered Out"] = res.filteredOut ? "True" : "False"
+            res.rawData["Filter Reason"] = res.filterReason
+            res.rawData["All Depts"] = res.allDepts.joined(separator: ", ")
+        }
+        
+        for i in 0..<overall.count { syncDerivedFields(&overall[i]) }
+        for i in 0..<roomsSplit.count { syncDerivedFields(&roomsSplit[i]) }
+        for i in 0..<deptsSchools.count { syncDerivedFields(&deptsSchools[i]) }
+        for i in 0..<raw.count {
+            raw[i].rawData["Calc Hours"] = String(format: "%.2f", calcCappedHours(res: raw[i]))
+            raw[i].rawData["Semester"] = raw[i].semester
+            raw[i].rawData["Filtered Out"] = raw[i].filteredOut ? "True" : "False"
+            raw[i].rawData["Filter Reason"] = raw[i].filterReason
+            raw[i].rawData["All Depts"] = extractDepartments(deptStr: raw[i].department, title: raw[i].reservationTitle).joined(separator: ", ")
+        }
+        
         return (overall, roomsSplit, deptsSchools, raw, sems)
     }
     

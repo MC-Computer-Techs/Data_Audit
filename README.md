@@ -137,3 +137,12 @@ The project has been ported to a fully native, standalone macOS application usin
 4. Click the **Run** button (or press `Cmd + R`) to compile and launch the application natively on your Mac.
 
 The macOS app supports importing `.csv` files natively and generates PDFs using macOS's built-in `PDFKit`.
+
+### CSV Bundle Export/Import
+The macOS app supports exporting the entire audit as a folder bundle and re-importing it later. The exported bundle includes:
+- `Grouping_Pairs/` — semester-sorted CSVs for rooms, departments, and schools
+- `Raw_Data.csv` — complete raw reservation data (including filtered items) for lossless round-trips
+- `Other/` — misformatted and "Other Schools" entries
+- `Top_Sheet_*.csv` and `One_Sheet_Updated_*.csv`
+
+When re-importing a bundle, the app will use `Raw_Data.csv` as the authoritative source and re-run the full processing pipeline, ensuring hours and filter states match the original. Bundles exported before this feature (without `Raw_Data.csv`) are still supported via the legacy grouping-pair reconstruction path.

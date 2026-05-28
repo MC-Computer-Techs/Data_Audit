@@ -158,6 +158,9 @@ struct CSVManager {
             try exportCSV(reservations: rooms, to: groupingDir.appendingPathComponent("\(code)_Rooms.csv"))
         }
         
+        // Export ALL raw reservations (including filtered) for lossless round-trip
+        try exportCSV(reservations: pack.raw, to: bundleURL.appendingPathComponent("Raw_Data.csv"))
+        
         let otherDir = bundleURL.appendingPathComponent("Other")
         try FileManager.default.createDirectory(at: otherDir, withIntermediateDirectories: true)
         
@@ -254,6 +257,60 @@ struct CSVManager {
     static func importBundle(from directoryURL: URL) throws -> (pack: (overall: [Reservation], rooms: [Reservation], deptsSchools: [Reservation], raw: [Reservation], semesters: [String]), oneSheetRows: [[String]]?) {
         let fm = FileManager.default
         
+        // Look for One Sheet first (shared by both paths)
+        var oneSheetRows: [[String]]? = nil
+        if let bundleFiles = try? fm.contentsOfDirectory(at: directoryURL, includingPropertiesForKeys: nil) {
+            if let osFile = bundleFiles.first(where: { $0.lastPathComponent.starts(with: "One_Sheet_Updated") }) {
+                oneSheetRows = try? parseCSVRows(from: osFile)
+            }
+        }
+        
+        // Preferred path: If Raw_Data.csv exists, use it as the authoritative source
+        // and re-run processReservations for a lossless round-trip.
+        let rawDataURL = directoryURL.appendingPathComponent("Raw_Data.csv")
+        if fm.fileExists(atPath: rawDataURL.path) {
+            let rawReservations = try importReservations(from: rawDataURL)
+            
+            // Infer date range from the bundle directory name (format: YYYY-MM-DD_to_YYYY-MM-DD_Data_Audit)
+            let dirName = directoryURL.lastPathComponent
+            let (inferredStart, inferredEnd) = parseBundleDateRange(from: dirName)
+            
+            let pack = DataProcessor.processReservations(
+                reservations: rawReservations,
+                startDate: inferredStart,
+                endDate: inferredEnd
+            )
+            return (pack, oneSheetRows)
+        }
+        
+        // Fallback path: Reconstruct from grouping pair files (backward compatibility)
+        return try importBundleLegacy(from: directoryURL, oneSheetRows: oneSheetRows)
+    }
+    
+    /// Parse start and end dates from a bundle directory name like "2024-09-01_to_2025-08-31_Data_Audit"
+    private static func parseBundleDateRange(from dirName: String) -> (start: Date, end: Date) {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        
+        // Default fallback: 2024-09-01 to 2025-08-31
+        let fallbackStart = df.date(from: "2024-09-01")!
+        let fallbackEnd = df.date(from: "2025-08-31")!
+        
+        let parts = dirName.split(separator: "_")
+        // Expected: ["2024-09-01", "to", "2025-08-31", "Data", "Audit"]
+        guard parts.count >= 3,
+              let start = df.date(from: String(parts[0])),
+              parts[1] == "to",
+              let end = df.date(from: String(parts[2])) else {
+            return (fallbackStart, fallbackEnd)
+        }
+        return (start, end)
+    }
+    
+    /// Legacy import path: reconstruct pack from grouping pair CSV files
+    private static func importBundleLegacy(from directoryURL: URL, oneSheetRows: [[String]]?) throws -> (pack: (overall: [Reservation], rooms: [Reservation], deptsSchools: [Reservation], raw: [Reservation], semesters: [String]), oneSheetRows: [[String]]?) {
+        let fm = FileManager.default
+        
         // 1. Grouping Pairs
         let groupingDir = directoryURL.appendingPathComponent("Grouping_Pairs")
         var deptsSchools = [Reservation]()
@@ -290,7 +347,6 @@ struct CSVManager {
         var uniqueDeptsSchools = [Reservation]()
         var seenDepts = Set<String>()
         for res in deptsSchools {
-            // Uniqueness is defined by id + Clean Department for deptsSchools
             let key = "\(res.id)_\(res.rawData["Clean Department"] ?? "")"
             if !seenDepts.contains(key) {
                 seenDepts.insert(key)
@@ -346,15 +402,6 @@ struct CSVManager {
         let sems = Array(Set(overall.map { $0.semester })).filter { $0 != "Other" }.sorted()
         
         let pack = (overall: overall, rooms: rooms, deptsSchools: deptsSchools, raw: raw, semesters: sems)
-        
-        // 4. One Sheet
-        var oneSheetRows: [[String]]? = nil
-        if let bundleFiles = try? fm.contentsOfDirectory(at: directoryURL, includingPropertiesForKeys: nil) {
-            if let osFile = bundleFiles.first(where: { $0.lastPathComponent.starts(with: "One_Sheet_Updated") }) {
-                oneSheetRows = try? parseCSVRows(from: osFile)
-            }
-        }
-        
         return (pack, oneSheetRows)
     }
 }

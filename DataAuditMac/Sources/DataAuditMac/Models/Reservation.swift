@@ -48,7 +48,11 @@ struct Reservation: Identifiable, Hashable {
     }
     
     var numRoomsUsed: Int {
-        if let val = rawData["# rooms used"], let i = Int(val) { return i }
+        if let val = rawData["# rooms used"] {
+            if let i = Int(val) { return i }
+            // Handle "2.0" style strings from CSV round-trips
+            if let d = Double(val) { return Int(d) }
+        }
         return 1
     }
     
