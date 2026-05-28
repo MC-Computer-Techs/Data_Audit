@@ -6,6 +6,8 @@ struct GroupingPairsView: View {
     let onSave: () -> Void
     let onDiscard: () -> Void
 
+    @State private var searchText: String = ""
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Header
@@ -18,6 +20,23 @@ struct GroupingPairsView: View {
                         .foregroundColor(.secondary)
                 }
                 Spacer()
+
+                // Search bar
+                HStack(spacing: 4) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.secondary)
+                    TextField("Search bookings… (⌘F)", text: $searchText)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 220)
+                    if !searchText.isEmpty {
+                        Button(action: { searchText = "" }) {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
                 if !edits.isEmpty {
                     Button(action: onDiscard) {
                         HStack(spacing: 4) {
@@ -72,7 +91,8 @@ struct GroupingPairsView: View {
                 data: schoolsData,
                 columns: orderedColumns(for: schoolsData, type: .schools),
                 edits: $edits,
-                defaultIncluded: true
+                defaultIncluded: true,
+                searchText: searchText
             )
 
             CollapsibleTableView(
@@ -80,7 +100,8 @@ struct GroupingPairsView: View {
                 data: deptsData,
                 columns: orderedColumns(for: deptsData, type: .departments),
                 edits: $edits,
-                defaultIncluded: true
+                defaultIncluded: true,
+                searchText: searchText
             )
 
             CollapsibleTableView(
@@ -88,7 +109,8 @@ struct GroupingPairsView: View {
                 data: roomsData,
                 columns: orderedColumns(for: roomsData, type: .rooms),
                 edits: $edits,
-                defaultIncluded: true
+                defaultIncluded: true,
+                searchText: searchText
             )
         }
     }

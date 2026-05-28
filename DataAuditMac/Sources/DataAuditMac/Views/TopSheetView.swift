@@ -44,6 +44,14 @@ struct TopSheetView: View {
                     label: "Total Hours",
                     value: String(format: "%.2f", pack.overall.reduce(0) { $0 + $1.calcHours })
                 )
+                MetricCard(
+                    label: "No Shows",
+                    value: "\(pack.raw.filter { $0.filterReason.contains("No Show") }.count)"
+                )
+                MetricCard(
+                    label: "Late Cancellations",
+                    value: "\(pack.raw.filter { $0.filterReason.contains("Late Cancellation") }.count)"
+                )
             }
 
             // Top Sheet Table
@@ -126,6 +134,14 @@ struct TopSheetView: View {
         rows.append(TopSheetRow(cells: ["Total # of reservations:"] + Array(repeating: "", count: sems.count) + ["\(pack.overall.count)"], isSectionTitle: true))
         rows.append(TopSheetRow(cells: ["Hours"] + totalHrs.map { String(format: "%.2f", $0) } + [String(format: "%.2f", totalHrs.reduce(0, +))], isSectionTitle: true))
         rows.append(TopSheetRow(cells: ["Reservations"] + totalRes.map { "\($0)" } + ["\(totalRes.reduce(0, +))"], isSectionTitle: true))
+
+        // No Shows & Late Cancellations (counted from raw filtered bookings within the date range)
+        let inRangeRaw = pack.raw.filter { !$0.filterReason.contains("Outside Selected Date Range") && !$0.filterReason.contains("Invalid Date") }
+        let noShowCounts = sems.map { s in inRangeRaw.filter({ $0.semester == s && $0.filterReason.contains("No Show") }).count }
+        rows.append(TopSheetRow(cells: ["No Shows"] + noShowCounts.map { "\($0)" } + ["\(noShowCounts.reduce(0, +))"]))
+        let lateCancelCounts = sems.map { s in inRangeRaw.filter({ $0.semester == s && $0.filterReason.contains("Late Cancellation") }).count }
+        rows.append(TopSheetRow(cells: ["Late Cancellations"] + lateCancelCounts.map { "\($0)" } + ["\(lateCancelCounts.reduce(0, +))"]))
+
 
         // Rooms
         let roomOrder = ["1201 Seminar Room", "233 Co-Lab", "230 Audio Lab", "221-224 Ballrooms", "220 Blackbox", "202 Lecture Hall", "103 Garage", "260 Post Production Lab"]

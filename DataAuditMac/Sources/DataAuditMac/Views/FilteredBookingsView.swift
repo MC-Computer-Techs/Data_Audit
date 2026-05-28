@@ -6,10 +6,16 @@ struct FilteredBookingsView: View {
     let onSave: () -> Void
     let onDiscard: () -> Void
 
+    @State private var searchText: String = ""
+
     var body: some View {
-        let filtered = pack.raw.filter { $0.filteredOut }
-        let misformatted = filtered.filter { $0.filterReason.contains("Room 000") }
-        let columns = orderedColumns(for: filtered)
+        // Only show filtered bookings that are within the selected date range
+        let inRangeFiltered = pack.raw.filter { $0.filteredOut && !$0.filterReason.contains("Outside Selected Date Range") && !$0.filterReason.contains("Invalid Date") }
+        let noShows = inRangeFiltered.filter { $0.filterReason.contains("No Show") }
+        let lateCancellations = inRangeFiltered.filter { $0.filterReason.contains("Late Cancellation") }
+        let misformatted = inRangeFiltered.filter { $0.filterReason.contains("Room 000") }
+        let otherFiltered = inRangeFiltered.filter { !$0.filterReason.contains("No Show") && !$0.filterReason.contains("Late Cancellation") && !$0.filterReason.contains("Room 000") }
+        let columns = orderedColumns(for: inRangeFiltered)
 
         VStack(alignment: .leading, spacing: 0) {
             // Header
@@ -23,7 +29,7 @@ struct FilteredBookingsView: View {
                     HStack(spacing: 6) {
                         Image(systemName: "exclamationmark.triangle.fill")
                             .foregroundColor(.red)
-                        Text("There are **\(filtered.count)** bookings filtered out.")
+                        Text("There are **\(inRangeFiltered.count)** bookings filtered out (\(noShows.count) No Shows, \(lateCancellations.count) Late Cancellations).")
                             .foregroundColor(.red)
                     }
                     .padding(.vertical, 6)
@@ -32,52 +38,97 @@ struct FilteredBookingsView: View {
                     .cornerRadius(8)
                 }
                 Spacer()
-                if !edits.isEmpty {
-                    Button(action: onDiscard) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "xmark")
-                            Text("Discard Changes")
+
+                // Search bar
+                VStack {
+                    HStack(spacing: 4) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(.secondary)
+                        TextField("Search bookings… (⌘F)", text: $searchText)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 220)
+                        if !searchText.isEmpty {
+                            Button(action: { searchText = "" }) {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.secondary)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
-                    .buttonStyle(.bordered)
-                    .tint(.red)
-                }
-                Button(action: onSave) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "square.and.arrow.down")
-                        Text("Save Changes")
+
+                    HStack {
+                        if !edits.isEmpty {
+                            Button(action: onDiscard) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "xmark")
+                                    Text("Discard Changes")
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(.red)
+                        }
+                        Button(action: onSave) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "square.and.arrow.down")
+                                Text("Save Changes")
+                            }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .disabled(edits.isEmpty)
                     }
                 }
-                .buttonStyle(.borderedProminent)
-                .disabled(edits.isEmpty)
             }
             .padding(.bottom, 16)
 
             // Tables
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
+                    if !noShows.isEmpty {
+                        CollapsibleTableView(
+                            title: "No Shows",
+                            data: noShows,
+                            columns: columns,
+                            edits: $edits,
+                            defaultIncluded: false,
+                            searchText: searchText
+                        )
+                    }
+
+                    if !lateCancellations.isEmpty {
+                        CollapsibleTableView(
+                            title: "Late Cancellations",
+                            data: lateCancellations,
+                            columns: columns,
+                            edits: $edits,
+                            defaultIncluded: false,
+                            searchText: searchText
+                        )
+                    }
+
                     if !misformatted.isEmpty {
                         CollapsibleTableView(
                             title: "Misformatted Rooms",
                             data: misformatted,
                             columns: columns,
                             edits: $edits,
-                            defaultIncluded: false
+                            defaultIncluded: false,
+                            searchText: searchText
                         )
                     }
 
-                    if !filtered.isEmpty {
+                    if !otherFiltered.isEmpty {
                         CollapsibleTableView(
-                            title: "Filtered Bookings",
-                            data: filtered,
+                            title: "Other Filtered Bookings",
+                            data: otherFiltered,
                             columns: columns,
                             edits: $edits,
-                            defaultIncluded: false
+                            defaultIncluded: false,
+                            searchText: searchText
                         )
                     }
 
-                    if filtered.isEmpty {
-                        Text("No filtered bookings found.")
+                    if inRangeFiltered.isEmpty {
+                        Text("No filtered bookings found within the selected date range.")
                             .foregroundColor(.secondary)
                             .padding()
                     }

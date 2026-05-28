@@ -243,11 +243,20 @@ struct DataProcessor {
             let hasCheckedIn = status.contains("checked in")
             let hasCheckedOut = status.contains("checked out")
             let hasApproval = status.contains("approved") || hasCheckedOut || hasCheckedIn
-            let hasRejection = status.contains("declined") || status.contains("canceled") || status.contains("cancelled") || status.contains("no show")
+            let hasNoShow = status.contains("no show")
+            let hasLateCancel = status.contains("late cancel") || status.contains("late cancellation")
+            let hasRejection = status.contains("declined") || status.contains("canceled") || status.contains("cancelled") || hasNoShow || hasLateCancel
             
             if !(hasApproval && !hasRejection) {
                 raw[i].filteredOut = true
-                raw[i].filterReason += "Status: \(res.endEventStatus); "
+                // Tag with specific reason for No Show / Late Cancellation
+                if hasNoShow {
+                    raw[i].filterReason += "No Show; "
+                } else if hasLateCancel {
+                    raw[i].filterReason += "Late Cancellation; "
+                } else {
+                    raw[i].filterReason += "Status: \(res.endEventStatus); "
+                }
             }
             
             // Maintenance filter

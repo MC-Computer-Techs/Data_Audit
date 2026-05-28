@@ -213,6 +213,13 @@ struct CSVManager {
         
         let resCount = pack.semesters.map { s in pack.overall.filter({ $0.semester == s }).count }
         lines.append(["Reservations"] + resCount.map { "\($0)" } + ["\(resCount.reduce(0, +))"])
+        
+        // No Shows & Late Cancellations (only bookings within the date range)
+        let inRangeRaw = pack.raw.filter { !$0.filterReason.contains("Outside Selected Date Range") && !$0.filterReason.contains("Invalid Date") }
+        let noShowCounts = pack.semesters.map { s in inRangeRaw.filter({ $0.semester == s && $0.filterReason.contains("No Show") }).count }
+        lines.append(["No Shows"] + noShowCounts.map { "\($0)" } + ["\(noShowCounts.reduce(0, +))"])
+        let lateCancelCounts = pack.semesters.map { s in inRangeRaw.filter({ $0.semester == s && $0.filterReason.contains("Late Cancellation") }).count }
+        lines.append(["Late Cancellations"] + lateCancelCounts.map { "\($0)" } + ["\(lateCancelCounts.reduce(0, +))"])
         lines.append([])
         
         func addSection(title: String, col: String, entities: [String], target: [Reservation]) {

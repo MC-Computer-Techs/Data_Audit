@@ -111,6 +111,13 @@ Based on the required reporting rules, the application alters the raw data mathe
 
 ## Recent Updates
 
+- **Search Function (⌘F)**: Added a search bar to the Grouping Pairs and Filtered Bookings tabs. Type any text to instantly filter table rows across all columns, showing only bookings that match your query. A clear button resets the search.
+- **No Show & Late Cancellation Tracking**: "No Show" and "Late Cancellation" statuses are now detected as distinct filter categories. They appear as separate collapsible sections in the Filtered Bookings tab, as dedicated rows in the Top Sheet table (both in-app and CSV export), and as metric cards at the top of the Top Sheet Overview.
+- **PDF Export Enhancements**: The PDF export now includes No Show and Late Cancellation counts alongside the existing reservation and hours metrics.
+- **Filtered Bookings Scoped to Date Range**: The Filtered Bookings tab now only displays bookings that fall within the selected date range. Out-of-range bookings are excluded from the view since they're not relevant to the current audit period.
+- **Fixed Date Sorting**: Sorting by date columns (Booking Start Date, Booking End Date) now uses proper date parsing instead of string comparison, ensuring correct chronological ordering regardless of date format.
+- **Batch Editing**: Select multiple rows in any table (Shift-click or Cmd-click), then edit a cell in any selected row — the change will automatically apply to all selected rows in that column. This makes bulk corrections much faster.
+- **Enhanced Edit Highlighting**: Edited cells now display a more prominent orange highlight (previously a subtle yellow) so modified values are immediately visible.
 - Fixed missing dependency (`reportlab`) causing PDF export failures. Use `uv pip install -r requirements.txt` within the `.venv` to install all necessary packages.
 - Added type coercion to ensure Excel imports containing numbers or empty values do not cause `float64` type errors when parsed against string-based grouping algorithms.
 - Fixed Excel round-trip hours drift (~48 hours lost on re-import). Root cause was false-positive change detection from type mismatches (`nan` vs empty string, `list` vs stringified list, float precision noise) that caused split per-room hours to overwrite full `ACTUAL hours` in the raw data. The import now skips derived columns and uses tolerance-based comparison for numerics.
@@ -146,3 +153,4 @@ The macOS app supports exporting the entire audit as a folder bundle and re-impo
 - `Top_Sheet_*.csv` and `One_Sheet_Updated_*.csv`
 
 When re-importing a bundle, the app will use `Raw_Data.csv` as the authoritative source and re-run the full processing pipeline, ensuring hours and filter states match the original. Bundles exported before this feature (without `Raw_Data.csv`) are still supported via the legacy grouping-pair reconstruction path.
+

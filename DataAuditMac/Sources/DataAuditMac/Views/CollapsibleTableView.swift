@@ -13,6 +13,7 @@ struct CollapsibleTableView: View {
     let columns: [String]
     @Binding var edits: [PendingEdit]
     let defaultIncluded: Bool
+    var searchText: String = ""
 
     @State private var isOpen = false
 
@@ -45,7 +46,8 @@ struct CollapsibleTableView: View {
                     data: data,
                     columns: columns,
                     edits: $edits,
-                    defaultIncluded: defaultIncluded
+                    defaultIncluded: defaultIncluded,
+                    searchText: searchText
                 )
                 .frame(height: min(CGFloat(data.count + 1) * 24 + 28, 500))
                 .padding(.top, 6)
@@ -62,6 +64,7 @@ struct NativeTableWrapper: NSViewRepresentable {
     let columns: [String]
     @Binding var edits: [PendingEdit]
     let defaultIncluded: Bool
+    var searchText: String = ""
 
     func makeCoordinator() -> Coordinator {
         Coordinator(edits: $edits, defaultIncluded: defaultIncluded)
@@ -117,14 +120,16 @@ struct NativeTableWrapper: NSViewRepresentable {
         let c = context.coordinator
         let prevEditCount = c.currentEdits.count
         let dataChanged = c.currentData.count != data.count
+        let searchChanged = c.currentSearchText != searchText
 
         c.currentData = data
         c.currentEdits = edits
         c.defaultIncluded = defaultIncluded
+        c.currentSearchText = searchText
 
-        // Full reload when data changes or edits bulk-cleared (discard)
-        if dataChanged || (prevEditCount > 0 && edits.isEmpty) {
-            c.updateSort()
+        // Full reload when data changes, edits bulk-cleared (discard), or search text changed
+        if dataChanged || (prevEditCount > 0 && edits.isEmpty) || searchChanged {
+            c.applySearchAndSort()
             c.tableView?.reloadData()
         }
     }
@@ -153,24 +158,72 @@ struct NativeTableWrapper: NSViewRepresentable {
         var columns: [String] = []
         var sortKey: String? = nil
         var sortAscending: Bool = true
+        var currentSearchText: String = ""
+
+        /// Date column names that should use date-aware sorting
+        private static let dateColumns: Set<String> = ["Booking Start Date", "Booking End Date"]
 
         init(edits: Binding<[PendingEdit]>, defaultIncluded: Bool) {
             self.edits = edits
             self.defaultIncluded = defaultIncluded
         }
 
-        func updateSort() {
-            guard let key = sortKey else { sortedData = currentData; return }
-            sortedData = currentData.sorted { a, b in
+        /// Apply search filtering first, then sort
+        func applySearchAndSort() {
+            // Step 1: Filter by search text
+            if currentSearchText.isEmpty {
+                sortedData = currentData
+            } else {
+                let query = currentSearchText.lowercased()
+                sortedData = currentData.filter { res in
+                    // Check if any cell value contains the search text
+                    for col in columns {
+                        let val = currentEdits.first(where: { $0.rawId == res.id && $0.column == col })?.value ?? res.rawData[col] ?? ""
+                        if val.lowercased().contains(query) {
+                            return true
+                        }
+                    }
+                    return false
+                }
+            }
+            // Step 2: Apply sort
+            applySortToFiltered()
+        }
+
+        private func applySortToFiltered() {
+            guard let key = sortKey else { return }
+            let isDateColumn = Self.dateColumns.contains(key)
+
+            sortedData.sort { a, b in
                 let aVal = currentEdits.first(where: { $0.rawId == a.id && $0.column == key })?.value ?? a.rawData[key] ?? ""
                 let bVal = currentEdits.first(where: { $0.rawId == b.id && $0.column == key })?.value ?? b.rawData[key] ?? ""
+
+                // Date-aware sorting for date columns
+                if isDateColumn {
+                    let aDate = Reservation.parseDate(from: aVal)
+                    let bDate = Reservation.parseDate(from: bVal)
+                    if let ad = aDate, let bd = bDate {
+                        return sortAscending ? ad < bd : ad > bd
+                    }
+                    // Put nil dates at the end
+                    if aDate != nil { return sortAscending }
+                    if bDate != nil { return !sortAscending }
+                    return false
+                }
+
+                // Numeric sorting
                 if let aNum = Double(aVal), let bNum = Double(bVal) {
                     return sortAscending ? aNum < bNum : aNum > bNum
                 }
+                // String sorting
                 return sortAscending
                     ? aVal.localizedCaseInsensitiveCompare(bVal) == .orderedAscending
                     : aVal.localizedCaseInsensitiveCompare(bVal) == .orderedDescending
             }
+        }
+
+        func updateSort() {
+            applySearchAndSort()
         }
 
         // MARK: DataSource
@@ -241,9 +294,10 @@ struct NativeTableWrapper: NSViewRepresentable {
             cellView.textField?.stringValue = displayValue
             cellView.textField?.delegate = self
 
+            // Highlight edited cells with a more prominent orange background
             if edit != nil {
                 cellView.textField?.drawsBackground = true
-                cellView.textField?.backgroundColor = NSColor.systemYellow.withAlphaComponent(0.15)
+                cellView.textField?.backgroundColor = NSColor.systemOrange.withAlphaComponent(0.25)
             } else {
                 cellView.textField?.drawsBackground = false
             }
@@ -275,10 +329,26 @@ struct NativeTableWrapper: NSViewRepresentable {
             let oldVal = currentEdits.first(where: { $0.rawId == res.id && $0.column == colId })?.value ?? res.rawData[colId] ?? ""
 
             if newVal != oldVal {
+                // Apply edit to the current row
                 handleCellChange(rawId: res.id, column: colId, value: newVal)
-                // Update just this cell's background
+
+                // Batch editing: apply the same edit to all other selected rows
+                let selectedRows = tv.selectedRowIndexes
+                for selectedRow in selectedRows {
+                    if selectedRow != row, selectedRow >= 0, selectedRow < sortedData.count {
+                        let selectedRes = sortedData[selectedRow]
+                        handleCellChange(rawId: selectedRes.id, column: colId, value: newVal)
+                    }
+                }
+
+                // Refresh to show updated highlights on all affected rows
                 tf.drawsBackground = true
-                tf.backgroundColor = NSColor.systemYellow.withAlphaComponent(0.15)
+                tf.backgroundColor = NSColor.systemOrange.withAlphaComponent(0.25)
+
+                // Reload other selected rows to update their cell backgrounds
+                if selectedRows.count > 1 {
+                    tv.reloadData(forRowIndexes: selectedRows, columnIndexes: IndexSet(integer: col))
+                }
             }
         }
 
