@@ -112,7 +112,7 @@ Based on the required reporting rules, the application alters the raw data mathe
 ## Recent Updates
 
 - **Search Function (⌘F)**: Added a search bar to the Grouping Pairs and Filtered Bookings tabs. Type any text to instantly filter table rows across all columns, showing only bookings that match your query. A clear button resets the search.
-- **No Show & Late Cancellation Tracking**: "No Show" and "Late Cancellation" statuses are now detected as distinct filter categories. They appear as separate collapsible sections in the Filtered Bookings tab, as dedicated rows in the Top Sheet table (both in-app and CSV export), and as metric cards at the top of the Top Sheet Overview.
+- **No Show & Late Cancellation Tracking**: "No Show" and "Late Cancellation" statuses are now detected as distinct filter categories. A booking is also automatically considered a "Late Cancellation" if it was canceled within 48 hours of the start time. They appear as separate collapsible sections in the Filtered Bookings tab, as dedicated rows in the Top Sheet table (both in-app and CSV export), and as metric cards at the top of the Top Sheet Overview.
 - **PDF Export Enhancements**: The PDF export now includes No Show and Late Cancellation counts alongside the existing reservation and hours metrics.
 - **Filtered Bookings Scoped to Date Range**: The Filtered Bookings tab now only displays bookings that fall within the selected date range. Out-of-range bookings are excluded from the view since they're not relevant to the current audit period.
 - **Fixed Date Sorting**: Sorting by date columns (Booking Start Date, Booking End Date) now uses proper date parsing instead of string comparison, ensuring correct chronological ordering regardless of date format.

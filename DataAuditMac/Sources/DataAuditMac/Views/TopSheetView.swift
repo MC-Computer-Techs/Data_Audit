@@ -6,17 +6,21 @@ struct TopSheetView: View {
 
     var isExporting: Bool = false
 
+    private var inRangeRaw: [Reservation] {
+        pack.raw.filter { !$0.filterReason.contains("Outside Selected Date Range") && !$0.filterReason.contains("Invalid Date") }
+    }
+
     var body: some View {
         if isExporting {
-            content
+            mainContent
         } else {
             ScrollView {
-                content
+                mainContent
             }
         }
     }
 
-    private var content: some View {
+    private var mainContent: some View {
         VStack(alignment: .leading, spacing: 20) {
             // Header with download buttons
             if !isExporting {
@@ -46,11 +50,11 @@ struct TopSheetView: View {
                 )
                 MetricCard(
                     label: "No Shows",
-                    value: "\(pack.raw.filter { $0.filterReason.contains("No Show") }.count)"
+                    value: "\(inRangeRaw.filter { $0.filterReason.contains("No Show") }.count)"
                 )
                 MetricCard(
                     label: "Late Cancellations",
-                    value: "\(pack.raw.filter { $0.filterReason.contains("Late Cancellation") }.count)"
+                    value: "\(inRangeRaw.filter { $0.filterReason.contains("Late Cancellation") }.count)"
                 )
             }
 
@@ -136,7 +140,6 @@ struct TopSheetView: View {
         rows.append(TopSheetRow(cells: ["Reservations"] + totalRes.map { "\($0)" } + ["\(totalRes.reduce(0, +))"], isSectionTitle: true))
 
         // No Shows & Late Cancellations (counted from raw filtered bookings within the date range)
-        let inRangeRaw = pack.raw.filter { !$0.filterReason.contains("Outside Selected Date Range") && !$0.filterReason.contains("Invalid Date") }
         let noShowCounts = sems.map { s in inRangeRaw.filter({ $0.semester == s && $0.filterReason.contains("No Show") }).count }
         rows.append(TopSheetRow(cells: ["No Shows"] + noShowCounts.map { "\($0)" } + ["\(noShowCounts.reduce(0, +))"]))
         let lateCancelCounts = sems.map { s in inRangeRaw.filter({ $0.semester == s && $0.filterReason.contains("Late Cancellation") }).count }

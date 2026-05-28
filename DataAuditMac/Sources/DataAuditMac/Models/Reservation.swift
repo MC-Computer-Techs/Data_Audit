@@ -30,6 +30,32 @@ struct Reservation: Identifiable, Hashable {
     var bookingStartTime: String { rawData["Booking Start Time"] ?? "" }
     var bookingEndTime: String { rawData["Booking End Time"] ?? "" }
     
+    var canceledAtDate: Date? {
+        guard let str = rawData["Canceled At"] else { return nil }
+        return Self.parseDate(from: str)
+    }
+
+    var fullBookingStartDate: Date? {
+        guard let startDate = bookingStartDate else { return nil }
+        let timeStr = bookingStartTime.trimmingCharacters(in: .whitespacesAndNewlines)
+        if timeStr.isEmpty { return startDate }
+        
+        let formatter = DateFormatter()
+        let timeFormats = ["h:mm a", "h:mm:ss a", "HH:mm", "HH:mm:ss"]
+        for tf in timeFormats {
+            formatter.dateFormat = tf
+            if let timeDate = formatter.date(from: timeStr) {
+                let calendar = Calendar.current
+                let timeComponents = calendar.dateComponents([.hour, .minute, .second], from: timeDate)
+                return calendar.date(bySettingHour: timeComponents.hour ?? 0,
+                                     minute: timeComponents.minute ?? 0,
+                                     second: timeComponents.second ?? 0,
+                                     of: startDate)
+            }
+        }
+        return startDate
+    }
+    
     var endEventStatus: String { rawData["End Event Status"] ?? "" }
     var bookingType: String { rawData["Booking Type"] ?? "" }
     var reservationTitle: String { rawData["Reservation Title"] ?? "" }
@@ -61,10 +87,19 @@ struct Reservation: Identifiable, Hashable {
         let formats = [
             "yyyy-MM-dd",
             "yyyy-MM-dd HH:mm:ss",
+            "yyyy-MM-dd h:mm a",
             "MM/dd/yyyy",
-            "M/d/yy",
+            "MM/dd/yyyy HH:mm:ss",
+            "MM/dd/yyyy h:mm a",
             "M/d/yyyy",
+            "M/d/yyyy HH:mm:ss",
+            "M/d/yyyy h:mm a",
+            "M/d/yy",
+            "M/d/yy HH:mm:ss",
+            "M/d/yy h:mm a",
             "MM/dd/yy",
+            "MM/dd/yy HH:mm:ss",
+            "MM/dd/yy h:mm a",
             "yyyy/MM/dd"
         ]
         return formats.map {
