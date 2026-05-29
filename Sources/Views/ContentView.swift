@@ -336,22 +336,13 @@ struct ContentView: View {
                     }
                 }
 
-                // Auto-export bundle to Documents folder (matching Python's auto-save behavior)
-                let df = DateFormatter()
-                df.dateFormat = "yyyy-MM-dd"
-                let bundleName = "\(df.string(from: currentStartDate))_to_\(df.string(from: currentEndDate))_Data_Audit"
-                let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-                let bundlePath = docsDir.appendingPathComponent(bundleName).path
-
-                try? CSVManager.exportBundle(pack: pack, startDate: currentStartDate, endDate: currentEndDate, oneSheetRows: osUpdated, to: docsDir)
-
                 DispatchQueue.main.async {
                     self.rawReservations = raw
                     self.processedPack = pack
                     self.historicOneSheetRows = osRows
                     self.oneSheetUpdatedRows = osUpdated
                     self.isProcessing = false
-                    self.successMessage = "Processing Complete! Files saved locally in `\(bundlePath)` directory."
+                    self.successMessage = "Processing Complete! Use \"Export Bundle\" to save files."
                 }
             } catch {
                 DispatchQueue.main.async {
@@ -398,9 +389,7 @@ struct ContentView: View {
                 osUpdated = DataProcessor.generateOneSheet(pack: pack, historicCSVRows: rows, startDate: currentStartDate)
             }
 
-            // Re-export bundle
-            let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-            try? CSVManager.exportBundle(pack: pack, startDate: currentStartDate, endDate: currentEndDate, oneSheetRows: osUpdated, to: docsDir)
+
 
             DispatchQueue.main.async {
                 self.processedPack = pack
@@ -418,9 +407,29 @@ struct ContentView: View {
         panel.prompt = "Select Output Directory"
 
         if panel.runModal() == .OK, let url = panel.url {
+            // Check for duplicate bundle folder
+            let df = DateFormatter()
+            df.dateFormat = "yyyy-MM-dd"
+            let bundleName = "\(df.string(from: startDate))_to_\(df.string(from: endDate))_Data_Audit"
+            let bundlePath = url.appendingPathComponent(bundleName)
+
+            if FileManager.default.fileExists(atPath: bundlePath.path) {
+                let alert = NSAlert()
+                alert.messageText = "Bundle Already Exists"
+                alert.informativeText = "A folder named \"\(bundleName)\" already exists at this location. Exporting will overwrite existing files inside it."
+                alert.alertStyle = .warning
+                alert.addButton(withTitle: "Overwrite")
+                alert.addButton(withTitle: "Cancel")
+                let response = alert.runModal()
+                if response != .alertFirstButtonReturn {
+                    return
+                }
+            }
+
             do {
                 if let pack = processedPack {
                     try CSVManager.exportBundle(pack: pack, startDate: startDate, endDate: endDate, oneSheetRows: oneSheetUpdatedRows, to: url)
+                    successMessage = "Bundle exported to \(bundlePath.path)"
                 }
             } catch {
                 errorMessage = "Failed to export bundle: \(error.localizedDescription)"

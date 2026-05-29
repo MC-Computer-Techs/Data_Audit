@@ -1,58 +1,59 @@
 # DataAuditMac
 
-Native macOS version of the Data Audit application, built with Swift and SwiftUI. A **1:1 replica** of the Python/React web application — processes reservation data locally and generates analytical reports without a web server or Python backend.
+Native macOS application for auditing reservation data, built with Swift and SwiftUI. Processes Booking Tool CSV files locally and generates analytical reports — no web server or Python backend required.
 
 ## Features
 
-- **Visual Upload Screen**: Drag-and-drop file zones for the Booking Tool CSV and optional Historic One Sheet CSV. Includes Start/End Date pickers along with an **Academic Year** drop-down picker to easily set standard start/end date ranges.
-- **Top Sheet Overview**: Metric cards (Total Reservations, Total Hours) with hover animations, followed by a structured data table with section title highlighting and semester column headers — matching the web app's styled HTML table.
-- **Grouping Pairs**: Full collapsible data tables for Schools, Departments, and Rooms per semester. Columns are displayed in canonical CSV export order with "Request #" first. **All cells are editable** — click any cell to type, select multiple cells, and copy/paste. Supports column sorting (click headers), per-row "Include" checkbox, multi-cell selection, and multi-row paste.
+- **Visual Upload Screen**: Drag-and-drop file zones for the Booking Tool CSV and optional Historic One Sheet CSV. Includes Start/End Date pickers along with an **Academic Year** drop-down picker to easily set standard start/end date ranges. Also supports importing a previously exported bundle folder to resume work.
+- **Top Sheet Overview**: Metric cards (Total Reservations, Total Hours) with hover animations, followed by a structured data table with section title highlighting and semester column headers.
+- **Grouping Pairs**: Collapsible data tables for Schools, Departments, and Rooms per semester. Columns are displayed in canonical CSV export order with "Request #" first. **All cells are editable** — click any cell to type, select multiple cells, and copy/paste. Supports column sorting (click headers), per-row "Include" checkbox, multi-cell selection, and multi-row paste.
 - **One Sheet Update**: Full scrollable table with purple AY row highlighting. "Download CSV" button for direct one-sheet export.
 - **Filtered Bookings**: Two collapsible subsections — "Misformatted Rooms" (Room 000 records) and "Filtered Bookings" (all filtered records). Full data tables with all cells editable, red background tint for excluded rows, filtered count badge.
-- **Batched Edit Pipeline**: Edits are collected as pending changes (highlighted in yellow). "Save Changes" applies all at once and triggers recalculation. "Discard Changes" clears pending edits. Matches the web app's batch-save behavior exactly.
-- **Auto-Export**: On initial upload, automatically saves the full export bundle to `~/Documents/` matching the Python app's auto-save behavior. Manual "Export Bundle" button also available.
-- **Bundle Exporter**: Creates the date-labeled folder (`YYYY-MM-DD_to_YYYY-MM-DD_Data_Audit/`) with `Grouping_Pairs/` and `Other/` subfolders, Top Sheet CSV, Misformatted CSV, Other Schools CSV, and updated One Sheet CSV.
-- **PDF Export**: Renders the Top Sheet as a high-quality PDF via native `ImageRenderer`. Fixed layout rendering perfectly matches the HTML structure but removes all scrolling constraints for a clean full-page render.
+- **Batched Edit Pipeline**: Edits are collected as pending changes (highlighted in yellow). "Save Changes" applies all at once and triggers recalculation. "Discard Changes" clears pending edits.
+- **Export Bundle**: The "Export Bundle" button is the only way to save output data. A file picker lets you choose the destination directory. If a bundle folder with the same name already exists at that location, a confirmation dialog warns you before overwriting — preventing accidental data loss.
+- **Bundle Contents**: Creates a date-labeled folder (`YYYY-MM-DD_to_YYYY-MM-DD_Data_Audit/`) containing:
+  - `Grouping_Pairs/` — Per-semester Schools, Departments, and Rooms CSVs
+  - `Other/` — Other Schools CSV and Misformatted Rooms CSV
+  - `Raw_Data.csv` — All raw reservations for lossless re-import
+  - `Top_Sheet_<dates>.csv` — Summary statistics
+  - `One_Sheet_Updated_<AY>.csv` — Updated one-sheet (if historic data was provided)
+- **PDF Export**: Renders the Top Sheet as a high-quality PDF via native `ImageRenderer`. Fixed layout rendering removes all scrolling constraints for a clean full-page render.
 
 ## How to Run
 
 Your Mac already includes the Swift compiler (Apple Swift 6.2.3), so no additional installs are needed.
 
 ```bash
-cd ~/Documents/DataAudit/DataAuditMac
+cd ~/Documents/DataAudit
 swift run
 ```
 
 This will download the `SwiftCSV` dependency, compile, and launch the application window.
 
-## Debug / Comparison Mode
-
-To compare Swift output against the Python/FastAPI backend numbers:
-
-```bash
-swift run DataAuditMac --debug /path/to/bookings.csv
-```
-
-This runs headless, processes the CSV with a wide date range (2024-2027), and prints per-semester, per-room, per-department, and per-school breakdowns to stdout.
-
 ## Project Structure
 
-- `Package.swift` — Swift Package Manager configuration
-- `Sources/DataAuditMac/` — Core source code
-  - `Models/Reservation.swift` — Data model with multi-format date parsing
-  - `Processing/DataProcessor.swift` — Filtering, hour calculation, department/school mapping, One Sheet generation
-  - `Processing/CSVManager.swift` — CSV import/export, bundle directory generation
-  - `Processing/PDFGenerator.swift` — PDF rendering via ImageRenderer
-  - `Views/ContentView.swift` — Main app shell (upload screen, tab bar, edit pipeline)
-  - `Views/TopSheetView.swift` — Metric cards + structured data table
-  - `Views/GroupingPairsView.swift` — Per-semester collapsible data tables with full editing
-  - `Views/FilteredBookingsView.swift` — Misformatted + Filtered subsections with full editing
-  - `Views/OneSheetView.swift` — Historic one-sheet display with download
-  - `Views/CollapsibleTableView.swift` — Reusable full-column table (sorting, multi-select, batch paste, edit tracking)
+```
+DataAuditMac/
+├── Package.swift                          # Swift Package Manager configuration
+├── Package.resolved                       # Resolved dependency versions
+├── Sources/
+│   ├── DataAuditMac.swift                 # App entry point + debug CLI mode
+│   ├── Models/
+│   │   └── Reservation.swift              # Data model with multi-format date parsing
+│   ├── Processing/
+│   │   ├── DataProcessor.swift            # Filtering, hour calculation, dept/school mapping, One Sheet generation
+│   │   ├── CSVManager.swift               # CSV import/export, bundle directory generation & import
+│   │   └── PDFGenerator.swift             # PDF rendering via ImageRenderer
+│   └── Views/
+│       ├── ContentView.swift              # Main app shell (upload screen, tab bar, edit pipeline, export)
+│       ├── TopSheetView.swift             # Metric cards + structured data table
+│       ├── GroupingPairsView.swift         # Per-semester collapsible data tables with full editing
+│       ├── FilteredBookingsView.swift      # Misformatted + Filtered subsections with full editing
+│       ├── OneSheetView.swift             # Historic one-sheet display with download
+│       └── CollapsibleTableView.swift     # Reusable full-column table (sorting, multi-select, batch paste, edit tracking)
+└── README.md
+```
 
-## Verification
+## Dependencies
 
-Tested against `bookings_2026-04-13.csv` (5668 rows). All numbers match the Python/FastAPI version exactly:
-- 710 filtered out, 4958 valid reservations
-- 29,968.06 total calculated hours
-- Per-semester, per-room, per-department, and per-school counts and hours all identical
+- [SwiftCSV](https://github.com/swiftcsv/SwiftCSV) (v0.8.1+) — CSV parsing and enumeration
