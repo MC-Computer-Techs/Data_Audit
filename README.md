@@ -21,6 +21,8 @@ Native macOS application for auditing reservation data, built with Swift and Swi
 
 ## How to Run
 
+### Terminal (Quick Start)
+
 Your Mac already includes the Swift compiler (Apple Swift 6.2.3), so no additional installs are needed.
 
 ```bash
@@ -29,6 +31,15 @@ swift run
 ```
 
 This will download the `SwiftCSV` dependency, compile, and launch the application window.
+
+### Building a Standalone Executable with Xcode
+
+1. **Open the project in Xcode**
+
+2. **Build for Release**:
+   - For an optimized release build, select **Product → Archive**
+
+   You can copy this binary anywhere on your Mac and run it directly — no Xcode or Swift toolchain required at runtime.
 
 ## Project Structure
 
