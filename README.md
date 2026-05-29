@@ -45,6 +45,13 @@ This will download the `SwiftCSV` dependency, compile, and launch the applicatio
 3. **Uploading to Google Drive**
    - Since Google Drive doesn't let you download files that can't be scanned, **Compress** the executable file into a zip file before uploading it so that it can be downloaded
 
+4. **Running the downloaded file**
+   - After downloading the zip file, it will automatically unpack the executable
+   - Double click to run, and press cancel after the "Apple could not verify..." message appears
+   - Navigate to **System Settings → Privacy & Security** and scroll to the bottom
+   - Click **Allow** next to the message saying the app was "blocked to protect your mac"
+   - Double click the application again and press **Open Anyway** to run the application
+
 ## Project Structure
 
 ```
