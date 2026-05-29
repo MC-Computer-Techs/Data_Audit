@@ -42,6 +42,9 @@ This will download the `SwiftCSV` dependency, compile, and launch the applicatio
 
    You can copy this binary anywhere on your Mac and run it directly — no Xcode or Swift toolchain required at runtime.
 
+3. **Uploading to Google Drive**
+   - Since Google Drive doesn't let you download files that can't be scanned, **Compress** the executable file into a zip file before uploading it so that it can be downloaded
+
 ## Project Structure
 
 ```
