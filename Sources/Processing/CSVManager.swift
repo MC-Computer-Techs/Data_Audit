@@ -406,7 +406,7 @@ struct CSVManager {
         }
         
         // Semesters
-        let sems = Array(Set(overall.map { $0.semester })).filter { $0 != "Other" }.sorted()
+        let sems = Array(Set(overall.map { $0.semester })).filter { $0 != "Other" }.sorted(by: DataProcessor.semesterOrder)
         
         let pack = (overall: overall, rooms: rooms, deptsSchools: deptsSchools, raw: raw, semesters: sems)
         return (pack, oneSheetRows)

@@ -5,7 +5,7 @@ Native macOS application for auditing reservation data, built with Swift and Swi
 ## Features
 
 - **Visual Upload Screen**: Drag-and-drop file zones for the Booking Tool CSV and optional Historic One Sheet CSV. Includes Start/End Date pickers along with an **Academic Year** drop-down picker to easily set standard start/end date ranges. Also supports importing a previously exported bundle folder to resume work.
-- **Top Sheet Overview**: Metric cards (Total Reservations, Total Hours) with hover animations, followed by a structured data table with section title highlighting and semester column headers.
+- **Top Sheet Overview**: Metric cards (Total Reservations, Total Hours) with hover animations, followed by a structured data table with section title highlighting and semester column headers ordered by academic year (Fall → Winter → Spring → Summer).
 - **Grouping Pairs**: Collapsible data tables for Schools, Departments, and Rooms per semester. Columns are displayed in canonical CSV export order with "Request #" first. **All cells are editable** — click any cell to type, select multiple cells, and copy/paste. Supports column sorting (click headers), per-row "Include" checkbox, multi-cell selection, and multi-row paste.
 - **One Sheet Update**: Full scrollable table with purple AY row highlighting. "Download CSV" button for direct one-sheet export.
 - **Filtered Bookings**: Four collapsible subsections — "No Shows", "Late Cancellations", "Misformatted Rooms" (Room 000 records), and "Other Filtered Bookings" (remaining filtered records). Full data tables with all cells editable, red background tint for excluded rows, filtered count badge, and an inline search bar (⌘F) for quick lookups.

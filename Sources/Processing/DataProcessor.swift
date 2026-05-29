@@ -144,6 +144,33 @@ struct DataProcessor {
         else { return "Summer \(year)" }
     }
     
+    /// Sort key for semester ordering: Fall → Winter → Spring → Summer within each academic year cycle.
+    /// Fall starts a new academic year, so Fall 2024 sorts before Winter 2025.
+    private static func semesterSortKey(_ sem: String) -> (Int, Int) {
+        let parts = sem.split(separator: " ")
+        let year = parts.count >= 2 ? (Int(parts[1]) ?? 0) : 0
+        let season = String(parts.first ?? "")
+        let seasonOrder: Int
+        switch season {
+        case "Fall":   seasonOrder = 0
+        case "Winter": seasonOrder = 1
+        case "Spring": seasonOrder = 2
+        case "Summer": seasonOrder = 3
+        default:       seasonOrder = 4
+        }
+        // Use academic year: Fall belongs to the current calendar year's AY,
+        // Winter/Spring/Summer belong to the previous calendar year's AY.
+        let academicYear = (season == "Fall") ? year : year - 1
+        return (academicYear, seasonOrder)
+    }
+    
+    static func semesterOrder(_ a: String, _ b: String) -> Bool {
+        let ka = semesterSortKey(a)
+        let kb = semesterSortKey(b)
+        if ka.0 != kb.0 { return ka.0 < kb.0 }
+        return ka.1 < kb.1
+    }
+    
     static func parseTime(from str: String) -> Date? {
         let trimmed = str.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty || trimmed.lowercased() == "nan" { return nil }
@@ -348,7 +375,7 @@ struct DataProcessor {
             }
         }
         
-        let sems = Array(Set(overall.map { $0.semester })).filter { $0 != "Other" }.sorted()
+        let sems = Array(Set(overall.map { $0.semester })).filter { $0 != "Other" }.sorted(by: semesterOrder)
         
         // Sync derived struct properties into rawData so exports contain all fields
         func syncDerivedFields(_ res: inout Reservation) {
