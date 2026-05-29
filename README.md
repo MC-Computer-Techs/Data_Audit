@@ -38,7 +38,7 @@ This will download the `SwiftCSV` dependency, compile, and launch the applicatio
 
 2. **Build for Release**:
    - For an optimized release build, select **Product → Archive**
-   - Select **Distribute Content** and click next on **Select a method for distribution** with **Custom** selected. Click Next on **Build Products** and choose the export location   
+   - Select **Distribute Content** and click next on **Select a method for distribution** with **Custom** selected. Click next on **Build Products** and choose the export location   
 
    You can copy this binary anywhere on your Mac and run it directly — no Xcode or Swift toolchain required at runtime.
 
