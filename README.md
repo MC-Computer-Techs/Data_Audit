@@ -59,7 +59,7 @@ DataAudit/
 ├── Package.swift                          # Swift Package Manager configuration
 ├── Package.resolved                       # Resolved dependency versions
 ├── Sources/
-│   ├── DataAuditMac.swift                 # App entry point + debug CLI mode
+│   ├── DataAuditMac.swift                 # App entry point
 │   ├── Models/
 │   │   └── Reservation.swift              # Data model with multi-format date parsing
 │   ├── Processing/
