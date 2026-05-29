@@ -33,7 +33,7 @@ This will download the `SwiftCSV` dependency, compile, and launch the applicatio
 ## Project Structure
 
 ```
-DataAuditMac/
+DataAudit/
 ├── Package.swift                          # Swift Package Manager configuration
 ├── Package.resolved                       # Resolved dependency versions
 ├── Sources/
