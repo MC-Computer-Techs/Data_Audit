@@ -245,8 +245,10 @@ struct DataProcessor {
             let hasApproval = status.contains("approved") || hasCheckedOut || hasCheckedIn
             let hasNoShow = status.contains("no show")
             
+            let hasCancelledStatus = status.contains("canceled") || status.contains("cancelled")
+            
             var isLateByTime = false
-            if let cDate = res.canceledAtDate, let sDate = res.fullBookingStartDate {
+            if hasCancelledStatus, let cDate = res.canceledAtDate, let sDate = res.fullBookingStartDate {
                 let diffHours = sDate.timeIntervalSince(cDate) / 3600.0
                 if diffHours >= 0 && diffHours <= 48.0 {
                     isLateByTime = true
@@ -254,7 +256,7 @@ struct DataProcessor {
             }
             
             let hasLateCancel = status.contains("late cancel") || status.contains("late cancellation") || isLateByTime
-            let hasRejection = status.contains("declined") || status.contains("canceled") || status.contains("cancelled") || hasNoShow || hasLateCancel
+            let hasRejection = status.contains("declined") || hasCancelledStatus || hasNoShow || hasLateCancel
             
             if !(hasApproval && !hasRejection) {
                 raw[i].filteredOut = true

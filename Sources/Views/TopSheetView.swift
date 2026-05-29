@@ -46,7 +46,7 @@ struct TopSheetView: View {
                 )
                 MetricCard(
                     label: "Total Hours",
-                    value: String(format: "%.2f", pack.overall.reduce(0) { $0 + $1.calcHours })
+                    value: "\(Int(pack.overall.reduce(0) { $0 + $1.calcHours }.rounded()))"
                 )
                 MetricCard(
                     label: "No Shows",
@@ -133,10 +133,10 @@ struct TopSheetView: View {
 
         // Totals
         let totalRes = sems.map { s in pack.overall.filter({ $0.semester == s }).count }
-        let totalHrs = sems.map { s in pack.overall.filter({ $0.semester == s }).reduce(0) { $0 + $1.calcHours } }
+        let totalHrsRounded = sems.map { s in Int(pack.overall.filter({ $0.semester == s }).reduce(0) { $0 + $1.calcHours }.rounded()) }
 
         rows.append(TopSheetRow(cells: ["Total # of reservations:"] + Array(repeating: "", count: sems.count) + ["\(pack.overall.count)"], isSectionTitle: true))
-        rows.append(TopSheetRow(cells: ["Hours"] + totalHrs.map { String(format: "%.2f", $0) } + [String(format: "%.2f", totalHrs.reduce(0, +))], isSectionTitle: true))
+        rows.append(TopSheetRow(cells: ["Hours"] + totalHrsRounded.map { "\($0)" } + ["\(totalHrsRounded.reduce(0, +))"], isSectionTitle: true))
         rows.append(TopSheetRow(cells: ["Reservations"] + totalRes.map { "\($0)" } + ["\(totalRes.reduce(0, +))"], isSectionTitle: true))
 
         // No Shows & Late Cancellations (counted from raw filtered bookings within the date range)
@@ -156,8 +156,8 @@ struct TopSheetView: View {
 
         rows.append(TopSheetRow(cells: ["Hours per room:"] + Array(repeating: "", count: sems.count + 1), isSectionTitle: true))
         for room in roomOrder {
-            let vals = sems.map { s in pack.rooms.filter({ $0.semester == s && $0.rawData["Clean Room"] == room }).reduce(0) { $0 + $1.calcHours } }
-            rows.append(TopSheetRow(cells: [room] + vals.map { String(format: "%.2f", $0) } + [String(format: "%.2f", vals.reduce(0, +))]))
+            let vals = sems.map { s in Int(pack.rooms.filter({ $0.semester == s && $0.rawData["Clean Room"] == room }).reduce(0) { $0 + $1.calcHours }.rounded()) }
+            rows.append(TopSheetRow(cells: [room] + vals.map { "\($0)" } + ["\(vals.reduce(0, +))"]))
         }
 
         // Programs
@@ -170,8 +170,8 @@ struct TopSheetView: View {
 
         rows.append(TopSheetRow(cells: ["Hours per Program:"] + Array(repeating: "", count: sems.count + 1), isSectionTitle: true))
         for prog in progOrder {
-            let vals = sems.map { s in pack.deptsSchools.filter({ $0.semester == s && $0.rawData["Clean Department"] == prog }).reduce(0) { $0 + $1.calcHours } }
-            rows.append(TopSheetRow(cells: [prog] + vals.map { String(format: "%.2f", $0) } + [String(format: "%.2f", vals.reduce(0, +))]))
+            let vals = sems.map { s in Int(pack.deptsSchools.filter({ $0.semester == s && $0.rawData["Clean Department"] == prog }).reduce(0) { $0 + $1.calcHours }.rounded()) }
+            rows.append(TopSheetRow(cells: [prog] + vals.map { "\($0)" } + ["\(vals.reduce(0, +))"]))
         }
 
         // Schools
@@ -184,8 +184,8 @@ struct TopSheetView: View {
 
         rows.append(TopSheetRow(cells: ["Hours per School:"] + Array(repeating: "", count: sems.count + 1), isSectionTitle: true))
         for school in schoolOrder {
-            let vals = sems.map { s in pack.deptsSchools.filter({ $0.semester == s && $0.rawData["Clean School"] == school }).reduce(0) { $0 + $1.calcHours } }
-            rows.append(TopSheetRow(cells: [school] + vals.map { String(format: "%.2f", $0) } + [String(format: "%.2f", vals.reduce(0, +))]))
+            let vals = sems.map { s in Int(pack.deptsSchools.filter({ $0.semester == s && $0.rawData["Clean School"] == school }).reduce(0) { $0 + $1.calcHours }.rounded()) }
+            rows.append(TopSheetRow(cells: [school] + vals.map { "\($0)" } + ["\(vals.reduce(0, +))"]))
         }
 
         return rows

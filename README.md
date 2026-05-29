@@ -17,7 +17,7 @@ Native macOS application for auditing reservation data, built with Swift and Swi
   - `Raw_Data.csv` — All raw reservations for lossless re-import
   - `Top_Sheet_<dates>.csv` — Summary statistics
   - `One_Sheet_Updated_<AY>.csv` — Updated one-sheet (if historic data was provided)
-- **PDF Export**: Renders the Top Sheet as a high-quality PDF via native `ImageRenderer`. Fixed layout rendering removes all scrolling constraints for a clean full-page render.
+- **PDF Export**: Renders the Top Sheet as a high-quality PDF via native `ImageRenderer`. All hour values are rounded to whole numbers, and totals are computed from the rounded figures so columns add up cleanly. Fixed layout rendering removes all scrolling constraints for a clean full-page render.
 
 ## How to Run
 
