@@ -26,7 +26,7 @@ Native macOS application for auditing reservation data, built with Swift and Swi
 Your Mac already includes the Swift compiler (Apple Swift 6.2.3), so no additional installs are needed.
 
 ```bash
-cd ~/Documents/DataAudit
+cd ~/DataAudit
 swift run
 ```
 
