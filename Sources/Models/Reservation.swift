@@ -63,6 +63,45 @@ struct Reservation: Identifiable, Hashable {
     var department: String { rawData["Department"] ?? "" }
     var manualOverrideFiltered: String { rawData["Manual Override Filtered"] ?? "" }
     
+    // Timestamp-based status columns
+    var noShowAtDate: Date? {
+        guard let str = rawData["No Show At"], !str.isEmpty else { return nil }
+        return Self.parseDate(from: str)
+    }
+    
+    var checkedInAtDate: Date? {
+        guard let str = rawData["Checked In At"], !str.isEmpty else { return nil }
+        return Self.parseDate(from: str)
+    }
+    
+    var checkedOutAtDate: Date? {
+        guard let str = rawData["Checked Out At"], !str.isEmpty else { return nil }
+        return Self.parseDate(from: str)
+    }
+    
+    var declinedAtDate: Date? {
+        guard let str = rawData["Declined At"], !str.isEmpty else { return nil }
+        return Self.parseDate(from: str)
+    }
+    
+    var firstApprovedAtDate: Date? {
+        guard let str = rawData["First Approved At"], !str.isEmpty else { return nil }
+        return Self.parseDate(from: str)
+    }
+    
+    var finalApprovedAtDate: Date? {
+        guard let str = rawData["Final Approved At"], !str.isEmpty else { return nil }
+        return Self.parseDate(from: str)
+    }
+    
+    // Convenience booleans for status checks
+    var hasNoShow: Bool { noShowAtDate != nil }
+    var hasCheckedIn: Bool { checkedInAtDate != nil }
+    var hasCheckedOut: Bool { checkedOutAtDate != nil }
+    var hasApproval: Bool { firstApprovedAtDate != nil || finalApprovedAtDate != nil }
+    var hasDecline: Bool { declinedAtDate != nil }
+    var hasCancellation: Bool { canceledAtDate != nil }
+    
     var actualHours: Double? {
         if let val = rawData["ACTUAL hours"], let d = Double(val) { return d }
         return nil

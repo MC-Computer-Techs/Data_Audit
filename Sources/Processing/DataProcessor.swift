@@ -265,25 +265,25 @@ struct DataProcessor {
             raw[i].filteredOut = false
             raw[i].filterReason = ""
             
-            // Status filter
-            let status = res.endEventStatus.lowercased()
-            let hasCheckedIn = status.contains("checked in")
-            let hasCheckedOut = status.contains("checked out")
-            let hasApproval = status.contains("approved") || hasCheckedOut || hasCheckedIn
-            let hasNoShow = status.contains("no show")
+            // Status filter — use individual timestamp columns instead of parsing End Event Status
+            let hasCheckedIn = res.hasCheckedIn
+            let hasCheckedOut = res.hasCheckedOut
+            let hasApproval = res.hasApproval || hasCheckedOut || hasCheckedIn
+            let hasNoShow = res.hasNoShow
             
-            let hasCancelledStatus = status.contains("canceled") || status.contains("cancelled")
+            let hasCancelledStatus = res.hasCancellation
             
             var isLateByTime = false
             if hasCancelledStatus, let cDate = res.canceledAtDate, let sDate = res.fullBookingStartDate {
                 let diffHours = sDate.timeIntervalSince(cDate) / 3600.0
-                if diffHours >= 0 && diffHours <= 48.0 {
+                if diffHours >= 0 && diffHours <= 24.0 {
                     isLateByTime = true
                 }
             }
             
-            let hasLateCancel = status.contains("late cancel") || status.contains("late cancellation") || isLateByTime
-            let hasRejection = status.contains("declined") || hasCancelledStatus || hasNoShow || hasLateCancel
+            let hasLateCancel = isLateByTime
+            let hasDecline = res.hasDecline
+            let hasRejection = hasDecline || hasCancelledStatus || hasNoShow || hasLateCancel
             
             if !(hasApproval && !hasRejection) {
                 raw[i].filteredOut = true

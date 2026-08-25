@@ -76,6 +76,34 @@ DataAudit/
 └── README.md
 ```
 
+## CSV Column Format
+
+The application supports the current Booking Tool CSV format, where reservation status is determined by **individual timestamp columns** rather than parsing a comma-separated `End Event Status` string.
+
+### Status Detection Columns
+
+| Column | Purpose |
+|--------|---------|
+| `No Show At` | Booking is a no-show if this has a timestamp |
+| `Canceled At` | Booking is canceled if this has a timestamp |
+| `Checked In At` / `Checked Out At` | Booking was attended |
+| `First Approved At` / `Final Approved At` | Booking was approved |
+| `Declined At` | Booking was declined |
+| `End Event Status` | Simple status label (e.g., "Approved") — retained as a display column |
+
+### Filtering Logic
+
+- **No Show**: `No Show At` column has a timestamp
+- **Late Cancellation**: `Canceled At` has a timestamp within **24 hours** before the approved booking start time
+- **Cancellation**: `Canceled At` has a timestamp (not late)
+- **Declined**: `Declined At` has a timestamp
+- **Approved**: `First Approved At` or `Final Approved At` has a timestamp, or the booking was checked in/out
+- **Kept**: Booking has approval AND no rejection (no-show, cancellation, or decline)
+
+### Service Columns
+
+The CSV includes: `Equipment Services (Y/N)`, `Equipment Service Details`, `Staffing Services (Y/N)`, `Staffing Service Details`, `Cleaning Services (Y/N)`. Legacy `Media Services (Y/N)` / `Media Service Details` columns are also supported for backward compatibility with older CSV files.
+
 ## Dependencies
 
 - [SwiftCSV](https://github.com/swiftcsv/SwiftCSV) (v0.8.1+) — CSV parsing and enumeration
